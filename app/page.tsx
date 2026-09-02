@@ -1,8 +1,8 @@
-export default function Home() {
-  return (
-    <main>
-      <h1>Newsletter Automation Workbench POC</h1>
-      <p>Milestone 1 content foundation is initialized.</p>
-    </main>
-  );
+import { Workbench } from "@/app/workbench";
+import { workbenchService } from "@/src/workbench/runtime";
+
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  return <Workbench state={await workbenchService.load()} />;
 }
