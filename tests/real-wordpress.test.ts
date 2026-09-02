@@ -67,7 +67,7 @@ function createFetch(response: Response | (() => Promise<Response> | Response)) 
 function assertNoSecret(value: unknown): void {
   const serialized = JSON.stringify(value);
   assert.equal(serialized.includes(ACCESS_TOKEN), false);
-  assert.equal(/Bearer\s+\S+/i.test(serialized), false);
+  assert.equal(/Bearer\s+(?!\[redacted\])\S+/i.test(serialized), false);
 }
 
 test("missing WordPress.com configuration does not create a real publisher config", () => {
@@ -185,12 +185,65 @@ test("authentication and provider failures return sanitized real failures", asyn
     assert.equal(result.mode, "real");
     assert.equal(result.provider, REAL_WORDPRESS_PROVIDER);
     if (result.status === "failed") {
+      assert.match(result.diagnostic, new RegExp(`HTTP ${status}`));
+      assert.match(result.diagnostic, /code=unauthorized/);
       assert.equal(result.diagnostic.includes(ACCESS_TOKEN), false);
-      assert.equal(/Bearer\s+\S+/i.test(result.diagnostic), false);
-      assert.equal(result.diagnostic.includes("secret"), false);
+      assert.equal(/Bearer\s+(?!\[redacted\])\S+/i.test(result.diagnostic), false);
+      assert.match(result.diagnostic, /\[redacted\]/);
     }
     assertNoSecret(result);
   }
+});
+
+test("ordinary 4xx diagnostics include only allowlisted status, code, and sanitized message", async () => {
+  const { fetchImpl } = createFetch(jsonResponse(400, {
+    error: "invalid_input",
+    message: "Publicize is not available for this site.",
+    content: `raw body with ${ACCESS_TOKEN}`,
+    authorization: `Bearer ${ACCESS_TOKEN}`,
+    extra: { stack: "Error: nope" },
+  }));
+  const publisher = new RealWordPress(
+    { siteId: SITE_ID, accessToken: ACCESS_TOKEN },
+    { fetch: fetchImpl },
+  );
+
+  const result = await publisher.publish(request);
+
+  assert.equal(result.status, "failed");
+  if (result.status === "failed") {
+    assert.equal(
+      result.diagnostic,
+      "WordPress.com rejected the publishing request (HTTP 400; code=invalid_input; Publicize is not available for this site.).",
+    );
+  }
+  assert.equal(JSON.stringify(result).includes("raw body"), false);
+  assert.equal(JSON.stringify(result).includes("Error: nope"), false);
+  assertNoSecret(result);
+});
+
+test("unsafe provider error identifiers and headers are omitted from diagnostics", async () => {
+  const { fetchImpl } = createFetch(jsonResponse(422, {
+    error: "not a valid code <script>",
+    code: "rest_cannot_create",
+    message: `Authorization: Bearer ${ACCESS_TOKEN} was rejected`,
+  }));
+  const publisher = new RealWordPress(
+    { siteId: SITE_ID, accessToken: ACCESS_TOKEN },
+    { fetch: fetchImpl },
+  );
+
+  const result = await publisher.publish(request);
+
+  assert.equal(result.status, "failed");
+  if (result.status === "failed") {
+    assert.match(result.diagnostic, /HTTP 422/);
+    assert.match(result.diagnostic, /code=rest_cannot_create/);
+    assert.doesNotMatch(result.diagnostic, /not a valid code/);
+    assert.doesNotMatch(result.diagnostic, /<script>/);
+    assert.match(result.diagnostic, /Bearer \[redacted\]/);
+  }
+  assertNoSecret(result);
 });
 
 test("network, timeout, server, and malformed outcomes are unknown and not retried by the adapter", async () => {

@@ -76,17 +76,10 @@ export class RealWordPress implements ContentPublisher {
   ): Promise<PublishingResult> {
     const payload = await readJsonPayload(response);
 
-    if (response.status === 401 || response.status === 403) {
-      return this.failure(
-        sourceStoryId,
-        "WordPress.com rejected the request because authentication or authorization failed.",
-      );
-    }
-
     if (response.status >= 400 && response.status < 500) {
       return this.failure(
         sourceStoryId,
-        "WordPress.com rejected the publishing request.",
+        formatClientRejection(response.status, payload),
       );
     }
 
@@ -238,10 +231,61 @@ function escapeHtml(value: string): string {
     .replaceAll('"', "&quot;");
 }
 
+const MAX_PROVIDER_MESSAGE_LENGTH = 160;
+const PROVIDER_ERROR_CODE_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
+
+function formatClientRejection(status: number, payload: unknown): string {
+  const prefix =
+    status === 401 || status === 403
+      ? "WordPress.com rejected the request because authentication or authorization failed"
+      : "WordPress.com rejected the publishing request";
+  const details = [`HTTP ${status}`];
+  const code = providerErrorCode(payload);
+  if (code) {
+    details.push(`code=${code}`);
+  }
+  const message = providerErrorMessage(payload);
+  if (message) {
+    details.push(message);
+  }
+  return `${prefix} (${details.join("; ")}).`;
+}
+
+function providerErrorCode(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== "object") {
+    return undefined;
+  }
+  const record = payload as Record<string, unknown>;
+  for (const key of ["error", "code"] as const) {
+    const value = record[key];
+    if (typeof value === "string" && PROVIDER_ERROR_CODE_PATTERN.test(value)) {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+function providerErrorMessage(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== "object") {
+    return undefined;
+  }
+  const value = (payload as Record<string, unknown>).message;
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const collapsed = value.replace(/\s+/g, " ").trim();
+  if (!collapsed) {
+    return undefined;
+  }
+  return collapsed.slice(0, MAX_PROVIDER_MESSAGE_LENGTH);
+}
+
 function sanitizeDiagnostic(diagnostic: string, accessToken: string): string {
   let sanitized = diagnostic;
   if (accessToken.length > 0) {
     sanitized = sanitized.split(accessToken).join("[redacted]");
   }
-  return sanitized.replace(/Bearer\s+\S+/gi, "Bearer [redacted]");
+  return sanitized
+    .replace(/Bearer\s+\S+/gi, "Bearer [redacted]")
+    .replace(/[?&](access_token|token|password|client_secret)=[^&\s]+/gi, "[redacted]");
 }
