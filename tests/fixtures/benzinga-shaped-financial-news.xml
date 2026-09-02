@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Fictional test data. Not a Benzinga feed or proprietary article text. -->
+<rss version="2.0" xmlns:media="https://search.yahoo.com/mrss/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Fictional Financial News Fixture</title>
+    <link>https://fixture.example.test/</link>
+    <description>Deterministic test fixture only.</description>
+    <item>
+      <title>Aurora Grid Reports Higher Storage Orders</title>
+      <link>https://fixture.example.test/news/aurora-grid-storage-orders</link>
+      <guid isPermaLink="false">fixture-aurora-grid-2026-09-02</guid>
+      <pubDate>Wed, 02 Sep 2026 03:30:00 GMT</pubDate>
+      <description><![CDATA[<p>Aurora Grid said quarterly storage orders rose after a fictional utility contract.</p>]]></description>
+      <dc:creator>Fixture Market Desk</dc:creator>
+      <media:content url="https://images.example.test/aurora-grid.jpg" medium="image" />
+    </item>
+    <item>
+      <title>Northline Retail Updates Its Seasonal Outlook</title>
+      <link>https://fixture.example.test/news/northline-retail-outlook</link>
+      <guid isPermaLink="false">fixture-northline-retail-2026-09-02</guid>
+      <pubDate>Wed, 02 Sep 2026 05:00:00 GMT</pubDate>
+      <description><![CDATA[<p>Northline Retail issued a fictional seasonal outlook and did not provide an image or byline.</p>]]></description>
+    </item>
+  </channel>
+</rss>
