@@ -3,7 +3,6 @@ import {
   moveStoryUp,
   publishSelectedStories,
   removeStory,
-  selectPublication,
 } from "@/app/actions";
 import { StoryPicker } from "@/app/story-picker";
 import { formatStoryTimestamp } from "@/app/story-presentation";
@@ -51,23 +50,25 @@ export function Workbench({ state }: WorkbenchProps) {
   const publishingResultsByStoryId = new Map(
     state.publishingResults.map((result) => [result.sourceStoryId, result]),
   );
-  const selectedPublication = state.publications.find(
-    (publication) => publication.id === state.draft.publicationId,
-  );
   const readyResults = state.publishingResults.filter(
     (result) => result.status === "published",
   ).length;
-  const canPrepare = Boolean(state.draft.publicationId && state.draft.selectedStories.length > 0);
+  const selectedCount = state.draft.selectedStories.length;
+  const hasPreparationResults = state.publishingResults.length > 0;
+  const canPrepare = selectedCount > 0;
+  const preparedStoryLabel = readyResults === 1 ? "story" : "stories";
+  const preparationSummary = readyResults === selectedCount
+    ? `${readyResults} ${preparedStoryLabel} prepared in the Mock WordPress test environment.`
+    : `${readyResults} of ${selectedCount} stories prepared in the Mock WordPress test environment.`;
 
   return (
     <main className="app-shell">
       <header className="app-header">
         <div className="brand-mark" aria-hidden="true">NB</div>
         <div className="header-copy">
-          <p className="eyebrow">Operator workbench</p>
           <h1>Newsletter Builder</h1>
           <p className="header-description">
-            Choose and organize stories already loaded into the workbench, then prepare them for the next step.
+            Choose stories, arrange your selections, and prepare them when you are ready.
           </p>
         </div>
         <div className="saved-indicator">
@@ -77,70 +78,13 @@ export function Workbench({ state }: WorkbenchProps) {
       </header>
 
       <div className="workbench-surface">
-        <div className="workflow-overview" aria-label="Newsletter building workflow">
-          <div className={`workflow-stage ${selectedPublication ? "is-complete" : "is-current"}`}>
-            <span className="stage-number">1</span>
-            <span>Choose newsletter</span>
-          </div>
-          <span className="stage-line" aria-hidden="true" />
-          <div className={`workflow-stage ${selectedStoryIds.length > 0 ? "is-complete" : selectedPublication ? "is-current" : ""}`}>
-            <span className="stage-number">2</span>
-            <span>Pick stories</span>
-          </div>
-          <span className="stage-line" aria-hidden="true" />
-          <div className={`workflow-stage ${readyResults > 0 ? "is-complete" : selectedStoryIds.length > 0 ? "is-current" : ""}`}>
-            <span className="stage-number">3</span>
-            <span>Organize</span>
-          </div>
-          <span className="stage-line" aria-hidden="true" />
-          <div className={`workflow-stage ${readyResults > 0 ? "is-current" : ""}`}>
-            <span className="stage-number">4</span>
-            <span>Prepare</span>
-          </div>
-        </div>
-
         <div className="builder-grid">
           <div className="builder-main">
-            <section className="workflow-panel" aria-labelledby="publication-heading">
-              <div className="panel-heading">
-                <span className="panel-step" aria-hidden="true">01</span>
-                <div>
-                  <h2 id="publication-heading">Choose your newsletter</h2>
-                  <p>Select the publication you are building today.</p>
-                </div>
-              </div>
-              <form action={selectPublication} className="publication-form">
-                <div className="field-group">
-                  <label htmlFor="publicationId">Publication</label>
-                  <select
-                    id="publicationId"
-                    name="publicationId"
-                    defaultValue={state.draft.publicationId ?? ""}
-                  >
-                    <option value="" disabled>Choose a publication</option>
-                    {state.publications.map((publication) => (
-                      <option key={publication.id} value={publication.id}>
-                        {publication.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <button className="button button-secondary" type="submit">Save choice</button>
-              </form>
-              {selectedPublication ? (
-                <p className="selection-confirmation">
-                  <span aria-hidden="true">✓</span>
-                  Building <strong>{selectedPublication.name}</strong>
-                </p>
-              ) : null}
-            </section>
-
             <section className="workflow-panel story-selection-panel" aria-labelledby="story-picker-heading">
               <div className="panel-heading">
-                <span className="panel-step" aria-hidden="true">02</span>
                 <div>
-                  <h2 id="story-picker-heading">Choose a story</h2>
-                  <p>Review one story at a time before adding it to your newsletter.</p>
+                  <h2 id="story-picker-heading">Choose content</h2>
+                  <p>Select a story to review before adding it to the newsletter.</p>
                 </div>
               </div>
               <StoryPicker
@@ -150,27 +94,26 @@ export function Workbench({ state }: WorkbenchProps) {
             </section>
           </div>
 
-          <aside className="builder-sidebar" aria-label="Newsletter draft and preparation">
+          <aside className="builder-sidebar" aria-label="Selected content and preparation">
             <section className="workflow-panel selected-panel" aria-labelledby="selected-stories-heading">
               <div className="panel-heading panel-heading-with-count">
-                <span className="panel-step" aria-hidden="true">03</span>
                 <div>
-                  <h2 id="selected-stories-heading">Newsletter stories</h2>
-                  <p>Arrange stories in the order they should appear.</p>
+                  <h2 id="selected-stories-heading">Selected content</h2>
+                  <p>These stories are currently included in the newsletter.</p>
                 </div>
                 <span
                   className="story-count"
-                  aria-label={`${selectedStoryIds.length} selected ${selectedStoryIds.length === 1 ? "story" : "stories"}`}
+                  aria-label={`${selectedCount} selected ${selectedCount === 1 ? "story" : "stories"}`}
                 >
-                  {selectedStoryIds.length}
+                  {selectedCount}
                 </span>
               </div>
 
-              {state.draft.selectedStories.length === 0 ? (
+              {selectedCount === 0 ? (
                 <div className="empty-state">
                   <div className="empty-state-icon" aria-hidden="true">+</div>
-                  <h3>Your newsletter is empty</h3>
-                  <p>Choose a story from the picker and add it here.</p>
+                  <h3>No stories included yet</h3>
+                  <p>Choose a story and add it to the newsletter.</p>
                 </div>
               ) : (
                 <ol className="selected-story-list">
@@ -182,7 +125,11 @@ export function Workbench({ state }: WorkbenchProps) {
                         <div className="selected-story-copy">
                           <h3>{story.title}</h3>
                           <p>{formatStoryTimestamp(story.publishedAt)}</p>
-                          {result ? <span className="mini-ready-label">Prepared</span> : null}
+                          {result ? (
+                            <span className={`mini-ready-label ${result.status === "failed" ? "is-failed" : ""}`}>
+                              {result.status === "published" ? "Prepared" : "Failed"}
+                            </span>
+                          ) : null}
                         </div>
                         <div className="story-order-actions" aria-label={`Controls for ${story.title}`}>
                           <form action={moveStoryUp}>
@@ -201,7 +148,7 @@ export function Workbench({ state }: WorkbenchProps) {
                             <button
                               className="small-button"
                               type="submit"
-                              disabled={index === state.draft.selectedStories.length - 1}
+                              disabled={index === selectedCount - 1}
                               aria-label={`Move ${story.title} down`}
                             >
                               <span aria-hidden="true">↓</span> Down
@@ -227,16 +174,15 @@ export function Workbench({ state }: WorkbenchProps) {
 
             <section className="workflow-panel preparation-panel" aria-labelledby="preparation-heading">
               <div className="panel-heading">
-                <span className="panel-step" aria-hidden="true">04</span>
                 <div>
-                  <h2 id="preparation-heading">Prepare for publishing</h2>
-                  <p>Resolve the selected stories through the current publishing step.</p>
+                  <h2 id="preparation-heading">Prepare</h2>
+                  <p>Create test preparation results for the stories currently included.</p>
                 </div>
               </div>
 
               <div className="publishing-mode">
                 <div>
-                  <span className="mode-label">Publishing mode</span>
+                  <span className="mode-label">Test environment</span>
                   <strong>Mock WordPress</strong>
                 </div>
                 <span className="mock-badge">MOCK</span>
@@ -247,21 +193,24 @@ export function Workbench({ state }: WorkbenchProps) {
                   Prepare selected stories
                 </button>
               </form>
-              {!canPrepare ? (
-                <p className="preparation-hint">
-                  Choose a publication and add at least one story to continue.
-                </p>
-              ) : (
-                <p className="preparation-hint">
-                  This POC uses an offline mock. No external WordPress request will be made.
-                </p>
-              )}
+              <p className="preparation-hint">
+                {canPrepare
+                  ? "Creates test results only. Nothing is published externally."
+                  : "Add at least one story to continue."}
+              </p>
 
-              {state.draft.selectedStories.length > 0 ? (
+              {hasPreparationResults ? (
+                <p className="preparation-summary" role="status">
+                  <strong>{preparationSummary}</strong>
+                  <span>Nothing was published externally.</span>
+                </p>
+              ) : null}
+
+              {selectedCount > 0 ? (
                 <div className="publishing-results" aria-live="polite">
                   <div className="results-heading">
-                    <h3>Preparation status</h3>
-                    <span>{readyResults} of {state.draft.selectedStories.length} ready</span>
+                    <h3>Result</h3>
+                    <span>{readyResults} of {selectedCount} ready</span>
                   </div>
                   <ul className="result-list">
                     {state.draft.selectedStories.map((story) => {
@@ -289,7 +238,7 @@ export function Workbench({ state }: WorkbenchProps) {
       </div>
 
       <footer className="app-footer">
-        Controlled fixture data · Single-operator POC · No external publishing
+        Sample content is used in this prototype.
       </footer>
     </main>
   );

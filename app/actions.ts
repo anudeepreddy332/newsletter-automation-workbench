@@ -12,11 +12,6 @@ function requiredValue(formData: FormData, field: string): string {
   return value;
 }
 
-export async function selectPublication(formData: FormData): Promise<void> {
-  await workbenchService.selectPublication(requiredValue(formData, "publicationId"));
-  revalidatePath("/");
-}
-
 export async function addStory(formData: FormData): Promise<void> {
   await workbenchService.addStory(requiredValue(formData, "storyId"));
   revalidatePath("/");

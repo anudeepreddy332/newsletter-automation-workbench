@@ -1,10 +1,10 @@
 import type { ContentSource } from "@/src/content/content-source";
-import type { WorkbenchState } from "@/src/domain/workbench";
+import type { Draft, WorkbenchState } from "@/src/domain/workbench";
 import type { ContentFeed } from "@/src/domain/story";
 import type { ContentPublisher, PublishingResult } from "@/src/publishing/content-publisher";
 import { ContentRepository } from "@/src/repositories/content-repository";
 import { WorkbenchRepository } from "@/src/repositories/workbench-repository";
-import { POC_PUBLICATIONS } from "@/src/workbench/publications";
+import { INTERNAL_POC_PUBLICATION, POC_PUBLICATIONS } from "@/src/workbench/publications";
 
 export class WorkbenchService {
   constructor(
@@ -16,19 +16,13 @@ export class WorkbenchService {
 
   async load(): Promise<WorkbenchState> {
     const contentFeed = await this.ensureFixtureContent();
-    this.workbenchRepository.savePublications(POC_PUBLICATIONS);
-    const draft = this.workbenchRepository.readActiveDraft();
+    const draft = this.ensureInternalPublication();
     return {
       publications: this.workbenchRepository.listPublications(),
       availableStories: this.contentRepository.listStories(contentFeed.id),
       draft,
       publishingResults: this.workbenchRepository.listPublishingResults(draft),
     };
-  }
-
-  async selectPublication(publicationId: string): Promise<void> {
-    await this.prepare();
-    this.workbenchRepository.selectPublication(publicationId);
   }
 
   async addStory(storyId: string): Promise<void> {
@@ -92,7 +86,18 @@ export class WorkbenchService {
 
   private async prepare(): Promise<void> {
     await this.ensureFixtureContent();
+    this.ensureInternalPublication();
+  }
+
+  private ensureInternalPublication(): Draft {
     this.workbenchRepository.savePublications(POC_PUBLICATIONS);
+    const draft = this.workbenchRepository.readActiveDraft();
+    if (draft.publicationId === INTERNAL_POC_PUBLICATION.id) {
+      return draft;
+    }
+
+    this.workbenchRepository.selectPublication(INTERNAL_POC_PUBLICATION.id);
+    return this.workbenchRepository.readActiveDraft();
   }
 
   private async ensureFixtureContent(): Promise<ContentFeed> {

@@ -36,7 +36,7 @@ export function StoryPicker({ stories, selectedStoryIds }: StoryPickerProps) {
             </option>
           ))}
         </select>
-        <p className="field-help">{stories.length} controlled fixture stories available</p>
+        <p className="field-help">{stories.length} stories available</p>
       </div>
 
       {!selectedStory ? (
@@ -46,13 +46,13 @@ export function StoryPicker({ stories, selectedStoryIds }: StoryPickerProps) {
             <span />
             <span />
           </div>
-          <p>Select a title above to see its summary and fixture details.</p>
+          <p>Select a title above to see its summary and details.</p>
         </div>
       ) : (
         <article className="story-detail-card">
           <div className="story-detail-header">
             <div>
-              <span className="fixture-label">Controlled story</span>
+              <span className="fixture-label">Story details</span>
               <h3>{selectedStory.title}</h3>
               <p className="story-byline">
                 <time dateTime={selectedStory.publishedAt}>
@@ -71,7 +71,7 @@ export function StoryPicker({ stories, selectedStoryIds }: StoryPickerProps) {
               className="button button-quiet"
               type="button"
               aria-expanded={isPreviewOpen}
-              aria-controls="fixture-story-preview"
+              aria-controls="story-preview"
               onClick={() => setIsPreviewOpen((open) => !open)}
             >
               {isPreviewOpen ? "Hide preview" : "Preview story"}
@@ -85,20 +85,20 @@ export function StoryPicker({ stories, selectedStoryIds }: StoryPickerProps) {
           </div>
 
           {isPreviewOpen ? (
-            <section id="fixture-story-preview" className="fixture-preview" aria-label="Fixture preview">
+            <section id="story-preview" className="fixture-preview" aria-label="Story preview">
               <div className="fixture-preview-heading">
-                <span className="fixture-preview-icon" aria-hidden="true">F</span>
+                <span className="fixture-preview-icon" aria-hidden="true">S</span>
                 <div>
-                  <span className="fixture-preview-label">Fixture preview</span>
-                  <p>Controlled content available in this POC</p>
+                  <span className="fixture-preview-label">Story preview</span>
+                  <p>Content available in this prototype</p>
                 </div>
               </div>
               {selectedStory.imageUrl ? (
                 <div className="fixture-image-reference">
                   <span className="image-placeholder" aria-hidden="true">▧</span>
                   <div>
-                    <strong>Fixture image reference</strong>
-                    <p>The feed includes image metadata, but the reserved test address is not loaded as an external image.</p>
+                    <strong>Image unavailable</strong>
+                    <p>This sample does not include a viewable image.</p>
                   </div>
                 </div>
               ) : null}
@@ -110,13 +110,10 @@ export function StoryPicker({ stories, selectedStoryIds }: StoryPickerProps) {
                   <dd>{formatStoryTimestamp(selectedStory.publishedAt)}</dd>
                 </div>
                 <div>
-                  <dt>Fixture URL</dt>
+                  <dt>Sample URL</dt>
                   <dd><code>{selectedStory.canonicalUrl}</code></dd>
                 </div>
               </dl>
-              <p className="fixture-disclaimer">
-                This preview contains only the controlled fixture content in the workbench, not a full Benzinga article.
-              </p>
             </section>
           ) : null}
         </article>

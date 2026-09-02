@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -12,7 +12,7 @@ import type { ContentSource } from "@/src/content/content-source";
 import { openContentDatabase } from "@/src/db/database";
 import { applyContentFoundationMigrations } from "@/src/db/migrate";
 import type { ContentDatabase } from "@/src/db/database";
-import { contentFeeds, publishingResults } from "@/src/db/schema";
+import { contentFeeds, drafts, publications, publishingResults } from "@/src/db/schema";
 import type { ContentFeed, Story } from "@/src/domain/story";
 import { ContentRepository } from "@/src/repositories/content-repository";
 import {
@@ -20,6 +20,7 @@ import {
   WorkbenchRepositoryError,
 } from "@/src/repositories/workbench-repository";
 import { WorkbenchService, WorkbenchServiceError } from "@/src/workbench/workbench-service";
+import { INTERNAL_POC_PUBLICATION } from "@/src/workbench/publications";
 
 const fixturePath = path.join(
   process.cwd(),
@@ -63,11 +64,14 @@ async function selectTwoStories(service: WorkbenchService): Promise<void> {
   await service.addStory(secondStoryId);
 }
 
-test("publication selection persists on the active draft", async () => {
+test("the neutral internal publication is applied deterministically", async () => {
   await withWorkbench(async (service) => {
-    await service.selectPublication("publication_market_brief");
+    const firstLoad = await service.load();
+    const secondLoad = await service.load();
 
-    assert.equal((await service.load()).draft.publicationId, "publication_market_brief");
+    assert.equal(firstLoad.draft.publicationId, INTERNAL_POC_PUBLICATION.id);
+    assert.equal(secondLoad.draft.publicationId, INTERNAL_POC_PUBLICATION.id);
+    assert.deepEqual(firstLoad.publications, [INTERNAL_POC_PUBLICATION]);
   });
 });
 
@@ -133,9 +137,11 @@ test("boundary moves do not corrupt persisted ordering", async () => {
 });
 
 test("an unknown publication ID is rejected safely", async () => {
-  await withWorkbench(async (service) => {
-    await assert.rejects(
-      service.selectPublication("publication_unknown"),
+  await withWorkbench(async (service, db) => {
+    await service.load();
+
+    assert.throws(
+      () => new WorkbenchRepository(db).selectPublication("publication_unknown"),
       (error: unknown) =>
         error instanceof WorkbenchRepositoryError && error.code === "UNKNOWN_PUBLICATION",
     );
@@ -153,7 +159,6 @@ test("an unknown story ID is rejected safely", async () => {
 
 test("draft reload returns the same persisted publication and story order", async () => {
   await withWorkbench(async (service) => {
-    await service.selectPublication("publication_daily_dispatch");
     await selectTwoStories(service);
     await service.moveStoryUp(secondStoryId);
     const expectedDraft = (await service.load()).draft;
@@ -169,9 +174,62 @@ test("content feeds and publications stay distinct concepts", async () => {
     assert.equal(state.availableStories[0]?.contentFeedId, "content_feed_benzinga_shaped_fixture");
     assert.deepEqual(
       state.publications.map((publication) => publication.id),
-      ["publication_daily_dispatch", "publication_market_brief"],
+      [INTERNAL_POC_PUBLICATION.id],
     );
   });
+});
+
+test("a legacy local draft is reassigned safely while its prior results remain valid", async () => {
+  await withWorkbench(async (service, db) => {
+    await service.addStory(firstStoryId);
+    const activeDraft = (await service.load()).draft;
+    const legacyPublication = {
+      id: "publication_daily_dispatch",
+      name: "Daily Dispatch",
+    };
+    db.insert(publications).values(legacyPublication).run();
+    db.update(drafts)
+      .set({ publicationId: legacyPublication.id })
+      .where(eq(drafts.id, activeDraft.id))
+      .run();
+    db.insert(publishingResults)
+      .values({
+        draftId: activeDraft.id,
+        publicationId: legacyPublication.id,
+        storyId: firstStoryId,
+        provider: "MockWordPress",
+        mode: "mock",
+        status: "published",
+        externalPostId: "mock_wp_legacy_result",
+        url: "https://wordpress-fixture.test/posts/mock_wp_legacy_result",
+        diagnostic: null,
+      })
+      .run();
+
+    const reloaded = await service.load();
+    const legacyResult = db.select()
+      .from(publishingResults)
+      .where(eq(publishingResults.publicationId, legacyPublication.id))
+      .get();
+
+    assert.equal(reloaded.draft.publicationId, INTERNAL_POC_PUBLICATION.id);
+    assert.deepEqual(reloaded.draft.selectedStories.map((story) => story.id), [firstStoryId]);
+    assert.equal(legacyResult?.publicationId, legacyPublication.id);
+    assert.deepEqual(
+      db.select().from(publications).where(eq(publications.id, legacyPublication.id)).get(),
+      legacyPublication,
+    );
+  });
+});
+
+test("the operator UI contains no publication selector or numbered workflow rail", () => {
+  const workbenchSource = readFileSync(path.join(process.cwd(), "app/workbench.tsx"), "utf8");
+  const actionsSource = readFileSync(path.join(process.cwd(), "app/actions.ts"), "utf8");
+
+  assert.doesNotMatch(workbenchSource, /publicationId|selectPublication|Save choice/);
+  assert.doesNotMatch(workbenchSource, /workflow-overview|panel-step|Choose newsletter/);
+  assert.doesNotMatch(workbenchSource, /Daily Dispatch|Market Brief/);
+  assert.doesNotMatch(actionsSource, /selectPublication/);
 });
 
 test("workbench loads stories from the content feed returned by its source", async () => {
@@ -212,22 +270,20 @@ test("workbench loads stories from the content feed returned by its source", asy
   });
 });
 
-test("publishing requires a selected publication", async () => {
+test("preparation works without operator publication selection", async () => {
   await withWorkbench(async (service) => {
     await service.addStory(firstStoryId);
+    const results = await service.publishSelectedStories();
+    const reloaded = await service.load();
 
-    await assert.rejects(
-      service.publishSelectedStories(),
-      (error: unknown) =>
-        error instanceof WorkbenchServiceError && error.code === "PUBLICATION_REQUIRED",
-    );
+    assert.deepEqual(results.map((result) => result.sourceStoryId), [firstStoryId]);
+    assert.equal(reloaded.draft.publicationId, INTERNAL_POC_PUBLICATION.id);
+    assert.deepEqual(reloaded.publishingResults, results);
   });
 });
 
 test("publishing requires at least one selected story", async () => {
   await withWorkbench(async (service) => {
-    await service.selectPublication("publication_market_brief");
-
     await assert.rejects(
       service.publishSelectedStories(),
       (error: unknown) =>
@@ -238,7 +294,6 @@ test("publishing requires at least one selected story", async () => {
 
 test("publishing processes only the stories currently selected on the active draft", async () => {
   await withWorkbench(async (service) => {
-    await service.selectPublication("publication_market_brief");
     await service.addStory(firstStoryId);
 
     const results = await service.publishSelectedStories();
@@ -249,7 +304,6 @@ test("publishing processes only the stories currently selected on the active dra
 
 test("MockWordPress results persist across reload and repeated publishing creates no duplicates", async () => {
   await withWorkbench(async (service, db) => {
-    await service.selectPublication("publication_daily_dispatch");
     await selectTwoStories(service);
 
     const firstRun = await service.publishSelectedStories();
@@ -272,7 +326,6 @@ test("MockWordPress results persist across reload and repeated publishing create
 
 test("publishing persistence keeps mock and future real-mode identities distinct", async () => {
   await withWorkbench(async (service, db) => {
-    await service.selectPublication("publication_market_brief");
     await service.addStory(firstStoryId);
     await service.publishSelectedStories();
     const draft = (await service.load()).draft;
