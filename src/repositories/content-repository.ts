@@ -27,6 +27,7 @@ export class ContentRepository {
         .insert(stories)
         .values({
           ...story,
+          body: story.body ?? null,
           imageUrl: story.imageUrl ?? null,
           sourceAuthor: story.sourceAuthor ?? null,
           sourceItemId: story.sourceItemId ?? null,
@@ -36,6 +37,7 @@ export class ContentRepository {
           set: {
             title: story.title,
             summary: story.summary,
+            body: story.body ?? null,
             canonicalUrl: story.canonicalUrl,
             imageUrl: story.imageUrl ?? null,
             publishedAt: story.publishedAt,
@@ -54,6 +56,7 @@ export class ContentRepository {
         contentFeedId: stories.contentFeedId,
         title: stories.title,
         summary: stories.summary,
+        body: stories.body,
         canonicalUrl: stories.canonicalUrl,
         imageUrl: stories.imageUrl,
         publishedAt: stories.publishedAt,
@@ -66,6 +69,7 @@ export class ContentRepository {
       .all()
       .map((story) => ({
         ...story,
+        body: story.body ?? undefined,
         imageUrl: story.imageUrl ?? undefined,
         sourceAuthor: story.sourceAuthor ?? undefined,
         sourceItemId: story.sourceItemId ?? undefined,

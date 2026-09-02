@@ -30,6 +30,7 @@ function asStory(row: typeof stories.$inferSelect): Story {
     contentFeedId: row.contentFeedId,
     title: row.title,
     summary: row.summary,
+    body: row.body ?? undefined,
     canonicalUrl: row.canonicalUrl,
     imageUrl: row.imageUrl ?? undefined,
     publishedAt: row.publishedAt,

@@ -9,6 +9,7 @@ export type Story = {
   contentFeedId: string;
   title: string;
   summary: string;
+  body?: string;
   canonicalUrl: string;
   imageUrl?: string;
   publishedAt: string;

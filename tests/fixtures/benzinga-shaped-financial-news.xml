@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Fictional test data. Not a Benzinga feed or proprietary article text. -->
-<rss version="2.0" xmlns:media="https://search.yahoo.com/mrss/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+<rss
+  version="2.0"
+  xmlns:content="http://purl.org/rss/1.0/modules/content/"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:media="https://search.yahoo.com/mrss/"
+>
   <channel>
     <title>Fictional Financial News Fixture</title>
     <link>https://fixture.example.test/</link>
@@ -10,8 +15,14 @@
       <link>https://fixture.example.test/news/aurora-grid-storage-orders</link>
       <guid isPermaLink="false">fixture-aurora-grid-2026-09-02</guid>
       <pubDate>Wed, 02 Sep 2026 03:30:00 GMT</pubDate>
-      <description><![CDATA[<p>Aurora Grid said quarterly storage orders rose after a fictional utility contract.</p>]]></description>
-      <dc:creator>Fixture Market Desk</dc:creator>
+      <description><![CDATA[<p>Aurora Grid said quarterly storage orders rose after a new utility contract expanded its project backlog.</p>]]></description>
+      <content:encoded><![CDATA[
+        <p>Aurora Grid reported a rise in quarterly orders for its modular battery systems after signing a multi-site agreement with regional utility Clearbrook Power. The fictional energy-storage supplier said the contract covers equipment for three substations scheduled to begin construction next spring.</p>
+        <p>Management said the agreement lifted the company's storage backlog by 18% from the prior quarter. Most of the new orders are for four-hour systems designed to shift excess solar generation into the evening demand period. Aurora expects to recognize the first equipment revenue during the second half of next year.</p>
+        <p>The company kept its full-year revenue outlook unchanged, citing normal permitting and interconnection risks. It also said battery-cell availability has improved, while freight and power-electronics costs remain the largest variables in project margins.</p>
+        <p>Aurora plans to provide an updated delivery schedule with its next quarterly report. Clearbrook has not announced whether it will exercise an option for two additional sites.</p>
+      ]]></content:encoded>
+      <dc:creator>Market Desk</dc:creator>
       <media:content url="https://images.example.test/aurora-grid.jpg" medium="image" />
     </item>
     <item>
@@ -19,7 +30,56 @@
       <link>https://fixture.example.test/news/northline-retail-outlook</link>
       <guid isPermaLink="false">fixture-northline-retail-2026-09-02</guid>
       <pubDate>Wed, 02 Sep 2026 05:00:00 GMT</pubDate>
-      <description><![CDATA[<p>Northline Retail issued a fictional seasonal outlook and did not provide an image or byline.</p>]]></description>
+      <description><![CDATA[<p>Northline Retail raised the lower end of its seasonal sales outlook as early demand improved across home and outdoor categories.</p>]]></description>
+      <content:encoded><![CDATA[
+        <p>Northline Retail raised the lower end of its seasonal comparable-sales forecast after reporting stronger early demand for home organization, outdoor equipment and basic apparel. The fictional chain now expects sales to range from flat to 2% higher during the period, compared with its prior range of a 1% decline to 2% growth.</p>
+        <p>Executives said customer traffic improved in suburban locations and online order pickup remained ahead of last year. Promotional activity was concentrated in older patio inventory, while newer home products sold closer to full price.</p>
+        <p>Northline cautioned that the final weeks of the season typically account for a large share of revenue. The company is holding additional inventory at two distribution centers so it can replenish stores without committing to broad markdowns.</p>
+        <p>The retailer left its expense forecast unchanged. It expects higher store wages to be offset partly by lower parcel-shipping costs and fewer temporary warehouse shifts.</p>
+      ]]></content:encoded>
+    </item>
+    <item>
+      <title>Calder Ridge Bank Expands Small-Business Lending Pilot</title>
+      <link>https://fixture.example.test/news/calder-ridge-lending-pilot</link>
+      <guid isPermaLink="false">fixture-calder-ridge-2026-09-02</guid>
+      <pubDate>Wed, 02 Sep 2026 06:15:00 GMT</pubDate>
+      <description><![CDATA[<p>Calder Ridge Bank is extending a small-business lending pilot to four additional markets after an initial six-month trial.</p>]]></description>
+      <content:encoded><![CDATA[
+        <p>Calder Ridge Bank said it will extend its small-business lending pilot to four additional metropolitan areas after completing a six-month trial in Lakeshore and Westhaven. The fictional regional lender offers revolving credit lines between $25,000 and $250,000 through the program.</p>
+        <p>The bank said applicants in the trial received an initial decision within two business days. Borrowers used most of the approved funds for equipment purchases, seasonal inventory and short-term working capital rather than property transactions.</p>
+        <p>Calder Ridge reported that early delinquencies remained within its internal expectations, although executives said the portfolio is too new to establish a full credit-cycle record. The expansion will retain manual review for larger requests and businesses with less than two years of operating history.</p>
+        <p>The lender plans to evaluate approval rates, customer retention and credit performance before deciding whether to make the program available across its entire branch network next year.</p>
+      ]]></content:encoded>
+      <dc:creator>Elena Park</dc:creator>
+    </item>
+    <item>
+      <title>Meridian Freight Trims Annual Fuel-Cost Forecast</title>
+      <link>https://fixture.example.test/news/meridian-freight-fuel-forecast</link>
+      <guid isPermaLink="false">fixture-meridian-freight-2026-09-02</guid>
+      <pubDate>Wed, 02 Sep 2026 07:40:00 GMT</pubDate>
+      <description><![CDATA[<p>Meridian Freight lowered its annual fuel-cost estimate after route changes reduced empty miles during the summer.</p>]]></description>
+      <content:encoded><![CDATA[
+        <p>Meridian Freight lowered its projected annual fuel expense after route-planning changes reduced the number of miles traveled without cargo. The fictional trucking company now expects fuel costs to finish between 4% and 6% below its original budget.</p>
+        <p>The carrier combined several short regional routes and introduced later cutoff times at two transfer hubs. Management said those changes allowed dispatchers to match more outbound loads with return freight, lifting trailer utilization without adding tractors.</p>
+        <p>Lower diesel prices contributed to the revised forecast, but Meridian said operational changes accounted for more than half of the expected savings. The company has not changed its assumptions for driver pay, insurance or fleet maintenance.</p>
+        <p>Meridian intends to expand the routing program to its eastern network during the fourth quarter. Executives said service levels remained stable during the initial rollout, with on-time delivery performance holding near the prior-year rate.</p>
+      ]]></content:encoded>
+      <media:content url="https://images.example.test/meridian-freight.jpg" medium="image" />
+    </item>
+    <item>
+      <title>Harborlight Foods Plans Regional Distribution Hub</title>
+      <link>https://fixture.example.test/news/harborlight-distribution-hub</link>
+      <guid isPermaLink="false">fixture-harborlight-foods-2026-09-02</guid>
+      <pubDate>Wed, 02 Sep 2026 09:05:00 GMT</pubDate>
+      <description><![CDATA[<p>Harborlight Foods plans to open a regional distribution hub intended to shorten delivery times for independent grocers.</p>]]></description>
+      <content:encoded><![CDATA[
+        <p>Harborlight Foods plans to open a regional distribution hub outside Pinehaven to support independent grocery customers across three neighboring states. The fictional packaged-food producer expects the leased facility to begin limited operations in the first quarter of next year.</p>
+        <p>The hub will hold shelf-stable meals, sauces and refrigerated prepared foods. Harborlight said the location should reduce average delivery distances and allow smaller stores to place mixed-product orders more frequently.</p>
+        <p>The company expects initial setup costs for refrigeration, inventory systems and warehouse equipment to total about $8 million. It plans to fund the project with existing cash and has not changed its capital-spending guidance for the year.</p>
+        <p>Harborlight will begin with approximately 60 employees and may add a second shift if order volume reaches its internal target. The company said its existing distribution partners will continue serving markets outside the new hub's regional coverage area.</p>
+      ]]></content:encoded>
+      <dc:creator>Jon Bell</dc:creator>
+      <media:content url="https://images.example.test/harborlight-foods.jpg" medium="image" />
     </item>
   </channel>
 </rss>

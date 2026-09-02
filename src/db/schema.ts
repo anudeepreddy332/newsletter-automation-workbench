@@ -14,6 +14,7 @@ export const stories = sqliteTable("stories", {
     .references(() => contentFeeds.id),
   title: text("title").notNull(),
   summary: text("summary").notNull(),
+  body: text("body"),
   canonicalUrl: text("canonical_url").notNull().unique(),
   imageUrl: text("image_url"),
   publishedAt: text("published_at").notNull(),

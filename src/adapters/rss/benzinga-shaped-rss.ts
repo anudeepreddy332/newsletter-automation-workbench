@@ -23,6 +23,7 @@ type RawRssItem = {
   guid?: unknown;
   pubDate?: unknown;
   "dc:creator"?: unknown;
+  "content:encoded"?: unknown;
   "media:content"?: unknown;
 };
 
@@ -67,6 +68,18 @@ function toPlainText(value: string): string {
   return value
     .replace(/<[^>]*>/g, " ")
     .replace(/\s+/g, " ")
+    .trim();
+}
+
+function toPlainStoryBody(value: string): string {
+  return value
+    .replace(/<br\s*\/?\s*>/gi, "\n")
+    .replace(/<\/(p|li|h[1-6])>/gi, "\n\n")
+    .replace(/<li[^>]*>/gi, "- ")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .replace(/ *\n */g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
@@ -137,6 +150,8 @@ function normalizeItem(item: RawRssItem, index: number): Story {
   }
 
   const sourceItemId = asString(item.guid);
+  const rawBody = asString(item["content:encoded"]);
+  const body = rawBody ? toPlainStoryBody(rawBody) || undefined : undefined;
   const idSeed = sourceItemId ?? `${canonicalUrl}|${publishedAt.toISOString()}`;
 
   return {
@@ -144,6 +159,7 @@ function normalizeItem(item: RawRssItem, index: number): Story {
     contentFeedId: BENZINGA_SHAPED_CONTENT_FEED.id,
     title,
     summary,
+    body,
     canonicalUrl,
     imageUrl: optionalImageUrl(item["media:content"], index),
     publishedAt: publishedAt.toISOString(),

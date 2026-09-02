@@ -6,6 +6,7 @@ import test from "node:test";
 
 import { eq } from "drizzle-orm";
 
+import { storyOptionLabel } from "@/app/story-presentation";
 import { BenzingaShapedFixtureSource } from "@/src/adapters/rss/benzinga-shaped-rss";
 import { MockWordPress } from "@/src/adapters/publishing/mock-wordpress";
 import type { ContentSource } from "@/src/content/content-source";
@@ -28,6 +29,7 @@ const fixturePath = path.join(
 );
 const firstStoryId = "story_6c43c8a1944281017858d68b";
 const secondStoryId = "story_5c6a67b4a9b7cb360ddc7877";
+const thirdStoryId = "story_f4144563fa09bd90887c8750";
 
 async function withWorkbench(
   run: (service: WorkbenchService, db: ContentDatabase) => Promise<void>,
@@ -83,6 +85,19 @@ test("story selection persists and duplicate selection leaves one draft entry", 
     assert.deepEqual(
       (await service.load()).draft.selectedStories.map((story) => story.id),
       [firstStoryId],
+    );
+  });
+});
+
+test("stories retain deterministic order-added across reload", async () => {
+  await withWorkbench(async (service) => {
+    await service.addStory(secondStoryId);
+    await service.addStory(thirdStoryId);
+    await service.addStory(firstStoryId);
+
+    assert.deepEqual(
+      (await service.load()).draft.selectedStories.map((story) => story.id),
+      [secondStoryId, thirdStoryId, firstStoryId],
     );
   });
 });
@@ -222,14 +237,36 @@ test("a legacy local draft is reassigned safely while its prior results remain v
   });
 });
 
-test("the operator UI contains no publication selector or numbered workflow rail", () => {
+test("the operator UI is vertical with no publication selector or ordering controls", () => {
   const workbenchSource = readFileSync(path.join(process.cwd(), "app/workbench.tsx"), "utf8");
+  const storyPickerSource = readFileSync(path.join(process.cwd(), "app/story-picker.tsx"), "utf8");
   const actionsSource = readFileSync(path.join(process.cwd(), "app/actions.ts"), "utf8");
 
   assert.doesNotMatch(workbenchSource, /publicationId|selectPublication|Save choice/);
   assert.doesNotMatch(workbenchSource, /workflow-overview|panel-step|Choose newsletter/);
   assert.doesNotMatch(workbenchSource, /Daily Dispatch|Market Brief/);
+  assert.doesNotMatch(workbenchSource, /moveStoryUp|moveStoryDown|Move .* up|Move .* down/);
+  assert.match(workbenchSource, /1\. Choose stories/);
+  assert.match(workbenchSource, /Stories added/);
+  assert.match(storyPickerSource, /View full story/);
+  assert.match(storyPickerSource, /Add to newsletter/);
+  assert.match(storyPickerSource, /selectedStory\?\.body/);
+  assert.doesNotMatch(storyPickerSource, /— in newsletter|In newsletter/);
+  assert.doesNotMatch(storyPickerSource, /<a(?:\s|>)|href=/);
+  assert.doesNotMatch(workbenchSource, /Choose advertiser links|Generate newsletter|RealWordPress/);
   assert.doesNotMatch(actionsSource, /selectPublication/);
+});
+
+test("story dropdown labels remain clean after a story is added", async () => {
+  await withWorkbench(async (service) => {
+    await service.addStory(firstStoryId);
+    const state = await service.load();
+    const labels = state.availableStories.map(storyOptionLabel);
+
+    assert.equal(labels.length, 5);
+    assert.deepEqual(labels, state.availableStories.map((story) => story.title));
+    assert.ok(labels.every((label) => !/in newsletter/i.test(label)));
+  });
 });
 
 test("workbench loads stories from the content feed returned by its source", async () => {
@@ -262,6 +299,7 @@ test("workbench loads stories from the content feed returned by its source", asy
     assert.deepEqual(state.availableStories, [
       {
         ...alternateStory,
+        body: undefined,
         imageUrl: undefined,
         sourceAuthor: undefined,
         sourceItemId: undefined,
