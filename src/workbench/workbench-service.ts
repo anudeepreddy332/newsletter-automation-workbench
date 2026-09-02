@@ -1,8 +1,13 @@
 import { MOCK_WORDPRESS_PROVIDER } from "@/src/adapters/publishing/mock-wordpress";
 import { REAL_WORDPRESS_PROVIDER } from "@/src/adapters/publishing/real-wordpress";
+import { mockEverflowOfferCatalog } from "@/src/adapters/offers/mock-everflow";
 import type { ContentSource } from "@/src/content/content-source";
 import type { Draft, WorkbenchState } from "@/src/domain/workbench";
+import type { OfferCatalog } from "@/src/domain/offer";
 import type { ContentFeed } from "@/src/domain/story";
+import { buildNewsletterAssemblyInput } from "@/src/newsletter/assembly";
+import { fingerprintNewsletterInput } from "@/src/newsletter/fingerprint";
+import { renderNewsletter } from "@/src/newsletter/renderer";
 import type {
   ContentPublisher,
   PublishingMode,
@@ -10,7 +15,7 @@ import type {
 } from "@/src/publishing/content-publisher";
 import { isBlockingPublishingResult } from "@/src/publishing/content-publisher";
 import { ContentRepository } from "@/src/repositories/content-repository";
-import { WorkbenchRepository } from "@/src/repositories/workbench-repository";
+import { WorkbenchRepository, type StoredDraft } from "@/src/repositories/workbench-repository";
 import { INTERNAL_POC_PUBLICATION, POC_PUBLICATIONS } from "@/src/workbench/publications";
 
 export class WorkbenchService {
@@ -20,17 +25,28 @@ export class WorkbenchService {
     private readonly workbenchRepository: WorkbenchRepository,
     private readonly mockPublisher: ContentPublisher,
     private readonly realPublisher: ContentPublisher | null = null,
+    private readonly offerCatalog: OfferCatalog = mockEverflowOfferCatalog,
   ) {}
 
   async load(): Promise<WorkbenchState> {
     const contentFeed = await this.ensureFixtureContent();
-    const draft = this.ensureInternalPublication();
+    const storedDraft = this.ensureInternalPublication();
+    const draft = this.hydrateDraft(storedDraft);
+    const generatedNewsletter = this.workbenchRepository.readGeneratedNewsletter();
+    const publishingResults = this.workbenchRepository.listPublishingResults(storedDraft);
+    const inputFingerprint = fingerprintNewsletterInput(
+      buildNewsletterAssemblyInput(draft.selectedStories, draft.selectedOffers, publishingResults),
+    );
     return {
       publications: this.workbenchRepository.listPublications(),
       availableStories: this.contentRepository.listStories(contentFeed.id),
+      availableOffers: [...this.offerCatalog.list()],
       draft,
-      publishingResults: this.workbenchRepository.listPublishingResults(draft),
+      publishingResults,
       realWordPressConfigured: this.realPublisher !== null,
+      generatedNewsletter,
+      generatedNewsletterIsCurrent:
+        generatedNewsletter !== null && generatedNewsletter.inputFingerprint === inputFingerprint,
     };
   }
 
@@ -52,6 +68,44 @@ export class WorkbenchService {
   async moveStoryDown(storyId: string): Promise<void> {
     await this.prepare();
     this.workbenchRepository.moveStory(storyId, "down");
+  }
+
+  async addOffer(offerId: string): Promise<void> {
+    await this.prepare();
+    if (!this.offerCatalog.get(offerId)) {
+      throw new WorkbenchServiceError("UNKNOWN_OFFER", "The selected advertiser offer does not exist.");
+    }
+    this.workbenchRepository.addOffer(offerId);
+  }
+
+  async removeOffer(offerId: string): Promise<void> {
+    await this.prepare();
+    this.workbenchRepository.removeOffer(offerId);
+  }
+
+  async generateNewsletter(): Promise<void> {
+    await this.prepare();
+    const draft = this.readDraft();
+    if (draft.selectedStories.length === 0) {
+      throw new WorkbenchServiceError(
+        "STORIES_REQUIRED",
+        "Select at least one story before generating a newsletter.",
+      );
+    }
+
+    const publishingResults = this.workbenchRepository.listPublishingResults(
+      this.workbenchRepository.readActiveDraft(),
+    );
+    const input = buildNewsletterAssemblyInput(
+      draft.selectedStories,
+      draft.selectedOffers,
+      publishingResults,
+    );
+    const rendered = renderNewsletter(input);
+    this.workbenchRepository.saveGeneratedNewsletter({
+      ...rendered,
+      inputFingerprint: fingerprintNewsletterInput(input),
+    });
   }
 
   async publishSelectedStories(mode: PublishingMode = "mock"): Promise<PublishingResult[]> {
@@ -99,7 +153,7 @@ export class WorkbenchService {
   }
 
   private async publishStory(
-    draft: Draft,
+    draft: StoredDraft,
     story: Draft["selectedStories"][number],
     mode: PublishingMode,
   ): Promise<PublishingResult> {
@@ -163,7 +217,7 @@ export class WorkbenchService {
     this.ensureInternalPublication();
   }
 
-  private ensureInternalPublication(): Draft {
+  private ensureInternalPublication(): StoredDraft {
     this.workbenchRepository.savePublications(POC_PUBLICATIONS);
     const draft = this.workbenchRepository.readActiveDraft();
     if (draft.publicationId === INTERNAL_POC_PUBLICATION.id) {
@@ -172,6 +226,28 @@ export class WorkbenchService {
 
     this.workbenchRepository.selectPublication(INTERNAL_POC_PUBLICATION.id);
     return this.workbenchRepository.readActiveDraft();
+  }
+
+  private readDraft(): Draft {
+    return this.hydrateDraft(this.workbenchRepository.readActiveDraft());
+  }
+
+  private hydrateDraft(stored: StoredDraft): Draft {
+    return {
+      id: stored.id,
+      publicationId: stored.publicationId,
+      selectedStories: stored.selectedStories,
+      selectedOffers: stored.selectedOfferIds.map((offerId) => {
+        const offer = this.offerCatalog.get(offerId);
+        if (!offer) {
+          throw new WorkbenchServiceError(
+            "UNKNOWN_OFFER",
+            "A stored advertiser offer is no longer in the catalog.",
+          );
+        }
+        return offer;
+      }),
+    };
   }
 
   private async ensureFixtureContent(): Promise<ContentFeed> {
@@ -188,7 +264,8 @@ export class WorkbenchServiceError extends Error {
       | "PUBLICATION_REQUIRED"
       | "STORIES_REQUIRED"
       | "PUBLISHER_RESULT_MISMATCH"
-      | "REAL_SINGLE_STORY_REQUIRED",
+      | "REAL_SINGLE_STORY_REQUIRED"
+      | "UNKNOWN_OFFER",
     message: string,
   ) {
     super(message);

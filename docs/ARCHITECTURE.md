@@ -21,7 +21,7 @@ RSS fixture -> ContentSource -> normalized Story records -> SQLite
                            MockWordPress | RealWordPress (optional)
                                                 |
                                                 v
-                         choose Mock Everflow-style offer -> tracking URL
+                         choose Mock Everflow-style offers -> tracking URLs
                                                 |
                                                 v
                       deterministic newsletter renderer -> HTML/text preview
@@ -43,7 +43,7 @@ email send.
 | `ContentPublisher` contract | Defines a shared publishing/resolution request and normalized result. | Hide adapter failures or choose a fallback adapter. |
 | `MockWordPress` | Required/default deterministic publisher with visible status, post ID, and URL. | Use a network connection or credentials. |
 | `RealWordPress` | Optional Milestone 3B adapter for one disposable WordPress.com test site using server-side credentials. | Access the target organization, support multiple sites, or silently fall back to Mock mode. |
-| Mock Everflow-style offer adapter | Provides a deterministic offer catalog and tracking URL for operator choice. | Call Everflow or select an offer automatically. |
+| Mock Everflow-style offer adapter | Provides a deterministic offer catalog and tracking URLs for operator choice of zero or more offers. | Call Everflow or select an offer automatically. |
 | Newsletter renderer | Produces deterministic HTML and plain text from explicitly selected inputs. | Invent editorial content or perform a send. |
 | Preview and approval boundary | Shows the exact render, records human approval, invalidates approval on edits, and prevents duplicate staging. | Treat a draft as approved without an explicit human action. |
 | `MockIterable` | Stages an approved immutable snapshot and returns an idempotent receipt. | Call Iterable, manage an audience, or send email. |
@@ -75,10 +75,19 @@ must not retry through, or be represented as, MockWordPress.
 
 ### Offers and rendering
 
-The POC uses a Mock Everflow-style adapter only. The operator chooses an offer;
-the adapter supplies its tracking URL. The renderer then creates exact HTML and
-plain text from the selected stories, resolved publishing data, and selected
-offer. It is deterministic and does not make editorial decisions.
+The POC uses a Mock Everflow-style adapter only. The operator may choose zero or
+more offers; the adapter supplies each tracking URL. Selected offers are stored
+against the draft in selection order. That order is not advertisement placement.
+
+The renderer then creates exact HTML and plain text from the selected stories,
+resolved publishing data when present, and selected offers. It is deterministic
+and does not make editorial decisions.
+
+Phase 4 uses one bounded POC placement convention: selected offers appear only
+in a final **Sponsored links** section, after all editorial stories, in
+selection order. This is a deterministic POC placement convention, not the
+target production placement policy. Placement logic is isolated from offer
+selection and persistence so it can be replaced later.
 
 ### Preview, approval, and staging
 
@@ -91,7 +100,7 @@ receipt. It never sends email.
 
 1. `ContentSource` reads a controlled fixture and returns normalized stories.
 2. The single operator chooses a newsletter brand/publication, stories, order,
-   and Mock Everflow-style offer.
+   and zero or more Mock Everflow-style offers.
 3. The selected stories pass through the WordPress publishing/resolution
    boundary.
 4. The renderer builds exact HTML and plain text from the selected inputs.

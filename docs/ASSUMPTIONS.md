@@ -25,7 +25,7 @@
   representative stakeholder feed is available**. It is fictional test data,
   not a copy of proprietary feed content or a compatibility claim.
 - The operator, rather than automation, selects and orders stories and chooses
-  the mock offer.
+  zero or more mock offers.
 - `ContentFeed` identifies a source feed. `Publication` is reserved for the
   future newsletter brand/publication selection, not source-feed identity.
 - Draft rendering can be deterministic once the selected inputs and future
@@ -40,8 +40,8 @@
 | What exact WordPress-to-newsletter payload is available: URL, excerpt, full content, image, formatting, metadata, or a combination? | Defines renderer inputs without invention. | Milestone 4 implementation. |
 | What newsletter brand/publication configurations can the operator select? | Defines the Milestone 2 publication boundary. | Milestone 2 implementation. |
 | What story eligibility, editorial, and ordering rules apply? | Keeps decisions human-led and prevents invented automation. | Milestone 2 completion. |
-| What mock offer fields and tracking URL form should the POC display? | Defines the deterministic Mock Everflow-style catalog. | Milestone 4 implementation. |
-| What subject, preheader, HTML, and plain-text content contract is required? | Defines deterministic rendering and exact preview. | Milestone 4 completion. |
+| What mock offer fields and tracking URL form should the POC display? | Defines the deterministic Mock Everflow-style catalog. | Milestone 4 implementation. **Phase 4 decision:** each offer has `id`, `advertiserName`, `offerName`, and a mock `trackingUrl` on `offers-fixture.test`. |
+| What subject, preheader, HTML, and plain-text content contract is required? | Defines deterministic rendering and exact preview. | Milestone 4 completion. **Phase 4 decision:** subject and preheader are the first selected story title and summary; HTML and plain text include selected stories then an optional final Sponsored links section. |
 | Who can approve a preview and what change counts as an approval-invalidating edit? | Defines review protection. | Milestone 5 implementation. |
 | What receipt fields prove mock staging and duplicate protection? | Defines Mock Iterable stage-only evidence. | Milestone 5 completion. |
 | Which disposable WordPress.com test site, credential method, post type, cleanup policy, and one-post interpretation are approved? | Bounds optional real publishing. | Milestone 3B start. |
@@ -52,3 +52,17 @@ Until the unresolved questions are answered in writing, implementation remains
 fixture-backed, deterministic, mock-first, human-controlled, and stage-only.
 It must not claim stakeholder-feed compatibility, live WordPress success, real
 offer tracking, real Iterable staging, or email delivery.
+
+## Phase 4 implementation decisions
+
+- Mock offers are five fictional catalog records. Tracking URLs are mock
+  `https://offers-fixture.test/...` values and are not live destinations.
+- One draft may contain zero or more manually selected offers. Selection order
+  is persisted and is not advertisement placement.
+- The WordPress-to-newsletter payload remains unresolved. Phase 4 rendering uses
+  normalized story title, summary, optional body, and a URL that prefers a
+  successful publishing result when one exists, otherwise the story canonical
+  URL.
+- Advertisement placement remains unknown. Phase 4 uses a final **Sponsored
+  links** section in selection order. This is a deterministic POC placement
+  convention, not the target production placement policy.

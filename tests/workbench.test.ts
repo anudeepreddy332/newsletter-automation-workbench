@@ -245,9 +245,11 @@ test("a legacy local draft is reassigned safely while its prior results remain v
   });
 });
 
-test("the operator UI is vertical with no publication selector or ordering controls", () => {
+test("the operator UI is vertical with story, advertiser, and generate steps", () => {
   const workbenchSource = readFileSync(path.join(process.cwd(), "app/workbench.tsx"), "utf8");
   const storyPickerSource = readFileSync(path.join(process.cwd(), "app/story-picker.tsx"), "utf8");
+  const offerPickerSource = readFileSync(path.join(process.cwd(), "app/offer-picker.tsx"), "utf8");
+  const generatedSource = readFileSync(path.join(process.cwd(), "app/generated-newsletter.tsx"), "utf8");
   const actionsSource = readFileSync(path.join(process.cwd(), "app/actions.ts"), "utf8");
 
   assert.doesNotMatch(workbenchSource, /publicationId|selectPublication|Save choice/);
@@ -255,13 +257,21 @@ test("the operator UI is vertical with no publication selector or ordering contr
   assert.doesNotMatch(workbenchSource, /Daily Dispatch|Market Brief/);
   assert.doesNotMatch(workbenchSource, /moveStoryUp|moveStoryDown|Move .* up|Move .* down/);
   assert.match(workbenchSource, /1\. Choose stories/);
+  assert.match(workbenchSource, /2\. Choose advertiser links/);
   assert.match(workbenchSource, /Stories added/);
+  assert.match(workbenchSource, /Advertiser links added/);
+  assert.match(generatedSource, /3\. Generate newsletter/);
+  assert.match(offerPickerSource, /Add advertiser link/);
+  assert.match(offerPickerSource, /Sample tracking URL/);
+  assert.doesNotMatch(offerPickerSource, /<a(?:\s|>)|href=/);
   assert.match(storyPickerSource, /View full story/);
   assert.match(storyPickerSource, /Add to newsletter/);
   assert.match(storyPickerSource, /selectedStory\?\.body/);
   assert.doesNotMatch(storyPickerSource, /— in newsletter|In newsletter/);
   assert.doesNotMatch(storyPickerSource, /<a(?:\s|>)|href=/);
-  assert.doesNotMatch(workbenchSource, /Choose advertiser links|Generate newsletter|Iterable|Everflow/);
+  assert.doesNotMatch(workbenchSource, /Iterable|Everflow|afterStoryId|relevance score/);
+  assert.doesNotMatch(generatedSource, /Iterable|approve|Approval/);
+  assert.doesNotMatch(actionsSource, /Iterable|approveNewsletter|stageToIterable/);
   assert.match(workbenchSource, /REAL WORDPRESS\.COM TEST SITE/);
   assert.match(workbenchSource, /result\.sourceStoryId === story\.id/);
   assert.doesNotMatch(workbenchSource, /WORDPRESS_ACCESS_TOKEN|name="accessToken"|name="siteId"|type="password"/);

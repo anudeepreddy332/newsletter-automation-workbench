@@ -1,4 +1,6 @@
-import { publishSelectedStories, removeStory } from "@/app/actions";
+import { publishSelectedStories, removeOffer, removeStory } from "@/app/actions";
+import { GeneratedNewsletterPanel } from "@/app/generated-newsletter";
+import { OfferPicker } from "@/app/offer-picker";
 import { StoryPicker } from "@/app/story-picker";
 import { formatStoryTimestamp } from "@/app/story-presentation";
 import type { WorkbenchState } from "@/src/domain/workbench";
@@ -82,7 +84,9 @@ function PublishingResultCard({ result }: { result: PublishingResult }) {
 
 export function Workbench({ state }: WorkbenchProps) {
   const selectedStoryIds = state.draft.selectedStories.map((story) => story.id);
+  const selectedOfferIds = state.draft.selectedOffers.map((offer) => offer.id);
   const selectedCount = state.draft.selectedStories.length;
+  const selectedOfferCount = state.draft.selectedOffers.length;
   const canPrepare = selectedCount > 0;
   const canPublishReal = state.realWordPressConfigured && selectedCount === 1;
   const mockPublishedCount = state.publishingResults.filter(
@@ -104,7 +108,7 @@ export function Workbench({ state }: WorkbenchProps) {
         <div className="header-copy">
           <h1>Newsletter Builder</h1>
           <p className="header-description">
-            Review and choose the stories to include in this newsletter.
+            Choose stories and advertiser links, then generate a newsletter from that selection.
           </p>
         </div>
         <div className="saved-indicator">
@@ -172,6 +176,70 @@ export function Workbench({ state }: WorkbenchProps) {
               </ol>
             )}
           </section>
+
+          <section className="workflow-panel offer-selection-panel" aria-labelledby="offer-picker-heading">
+            <div className="panel-heading">
+              <div>
+                <h2 id="offer-picker-heading">2. Choose advertiser links</h2>
+                <p>Select one or more sample advertiser offers to include with this newsletter.</p>
+              </div>
+            </div>
+            <p className="sample-offers-note">Sample advertiser offers are used in this prototype.</p>
+            <OfferPicker
+              offers={state.availableOffers}
+              selectedOfferIds={selectedOfferIds}
+            />
+          </section>
+
+          <section className="workflow-panel selected-panel selected-offers-panel" aria-labelledby="selected-offers-heading">
+            <div className="panel-heading panel-heading-with-count">
+              <div>
+                <h2 id="selected-offers-heading">Advertiser links added</h2>
+                <p>These advertiser offers will appear in a separate sponsored-links section.</p>
+              </div>
+              <span
+                className="story-count"
+                aria-label={`${selectedOfferCount} ${selectedOfferCount === 1 ? "advertiser link" : "advertiser links"} added`}
+              >
+                {selectedOfferCount}
+              </span>
+            </div>
+
+            {selectedOfferCount === 0 ? (
+              <div className="empty-state">
+                <div className="empty-state-icon" aria-hidden="true">+</div>
+                <h3>No advertiser links added yet</h3>
+                <p>You can generate a newsletter without advertiser links, or add some above.</p>
+              </div>
+            ) : (
+              <ul className="selected-story-list">
+                {state.draft.selectedOffers.map((offer) => (
+                  <li key={offer.id} className="selected-story-item selected-offer-item">
+                    <div className="selected-story-copy">
+                      <h3>{offer.advertiserName} — {offer.offerName}</h3>
+                      <p><code>{offer.trackingUrl}</code></p>
+                    </div>
+                    <form className="selected-story-actions" action={removeOffer}>
+                      <input type="hidden" name="offerId" value={offer.id} />
+                      <button
+                        className="small-button remove-button"
+                        type="submit"
+                        aria-label={`Remove ${offer.advertiserName} ${offer.offerName} from newsletter`}
+                      >
+                        Remove
+                      </button>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <GeneratedNewsletterPanel
+            canGenerate={canPrepare}
+            generatedNewsletter={state.generatedNewsletter}
+            generatedNewsletterIsCurrent={state.generatedNewsletterIsCurrent}
+          />
 
           <section className="workflow-panel preparation-panel" aria-labelledby="preparation-heading">
             <div className="panel-heading">

@@ -37,3 +37,18 @@ export async function publishSelectedStories(formData: FormData): Promise<void> 
   await workbenchService.publishSelectedStories(mode);
   revalidatePath("/");
 }
+
+export async function addOffer(formData: FormData): Promise<void> {
+  await workbenchService.addOffer(requiredValue(formData, "offerId"));
+  revalidatePath("/");
+}
+
+export async function removeOffer(formData: FormData): Promise<void> {
+  await workbenchService.removeOffer(requiredValue(formData, "offerId"));
+  revalidatePath("/");
+}
+
+export async function generateNewsletter(): Promise<void> {
+  await workbenchService.generateNewsletter();
+  revalidatePath("/");
+}

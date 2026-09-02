@@ -33,6 +33,11 @@ export const drafts = sqliteTable("drafts", {
   publicationId: text("publication_id").references(() => publications.id),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  generatedSubject: text("generated_subject"),
+  generatedPreheader: text("generated_preheader"),
+  generatedHtml: text("generated_html"),
+  generatedPlainText: text("generated_plain_text"),
+  generatedInputFingerprint: text("generated_input_fingerprint"),
 });
 
 export const draftStories = sqliteTable(
@@ -47,6 +52,18 @@ export const draftStories = sqliteTable(
     position: integer("position").notNull(),
   },
   (table) => [primaryKey({ columns: [table.draftId, table.storyId] })],
+);
+
+export const draftOffers = sqliteTable(
+  "draft_offers",
+  {
+    draftId: text("draft_id")
+      .notNull()
+      .references(() => drafts.id, { onDelete: "cascade" }),
+    offerId: text("offer_id").notNull(),
+    position: integer("position").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.draftId, table.offerId] })],
 );
 
 export const publishingResults = sqliteTable(

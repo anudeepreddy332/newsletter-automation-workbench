@@ -2,13 +2,15 @@ import { and, asc, eq } from "drizzle-orm";
 
 import type { ContentDatabase } from "@/src/db/database";
 import {
+  draftOffers,
   draftStories,
   drafts,
   publications,
   publishingResults,
   stories,
 } from "@/src/db/schema";
-import type { Draft, Publication } from "@/src/domain/workbench";
+import type { GeneratedNewsletter } from "@/src/domain/newsletter";
+import type { Publication } from "@/src/domain/workbench";
 import type { Story } from "@/src/domain/story";
 import type { PublishingMode, PublishingResult } from "@/src/publishing/content-publisher";
 
@@ -23,6 +25,13 @@ export class WorkbenchRepositoryError extends Error {
     this.name = "WorkbenchRepositoryError";
   }
 }
+
+export type StoredDraft = {
+  id: string;
+  publicationId?: string;
+  selectedStories: Story[];
+  selectedOfferIds: string[];
+};
 
 function asStory(row: typeof stories.$inferSelect): Story {
   return {
@@ -110,7 +119,7 @@ export class WorkbenchRepository {
     return this.db.select().from(publications).orderBy(asc(publications.id)).all();
   }
 
-  readActiveDraft(): Draft {
+  readActiveDraft(): StoredDraft {
     this.db
       .insert(drafts)
       .values({ id: ACTIVE_DRAFT_ID })
@@ -136,11 +145,62 @@ export class WorkbenchRepository {
       .all()
       .map(({ story }) => asStory(story));
 
+    const selectedOfferIds = this.db
+      .select({ offerId: draftOffers.offerId })
+      .from(draftOffers)
+      .where(eq(draftOffers.draftId, ACTIVE_DRAFT_ID))
+      .orderBy(asc(draftOffers.position), asc(draftOffers.offerId))
+      .all()
+      .map((row) => row.offerId);
+
     return {
       id: draft.id,
       publicationId: draft.publicationId ?? undefined,
       selectedStories,
+      selectedOfferIds,
     };
+  }
+
+  readGeneratedNewsletter(): GeneratedNewsletter | null {
+    const draft = this.db
+      .select()
+      .from(drafts)
+      .where(eq(drafts.id, ACTIVE_DRAFT_ID))
+      .get();
+
+    if (
+      !draft?.generatedSubject ||
+      !draft.generatedPreheader ||
+      !draft.generatedHtml ||
+      !draft.generatedPlainText ||
+      !draft.generatedInputFingerprint
+    ) {
+      return null;
+    }
+
+    return {
+      subject: draft.generatedSubject,
+      preheader: draft.generatedPreheader,
+      html: draft.generatedHtml,
+      plainText: draft.generatedPlainText,
+      inputFingerprint: draft.generatedInputFingerprint,
+    };
+  }
+
+  saveGeneratedNewsletter(newsletter: GeneratedNewsletter): void {
+    this.readActiveDraft();
+    this.db
+      .update(drafts)
+      .set({
+        generatedSubject: newsletter.subject,
+        generatedPreheader: newsletter.preheader,
+        generatedHtml: newsletter.html,
+        generatedPlainText: newsletter.plainText,
+        generatedInputFingerprint: newsletter.inputFingerprint,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(drafts.id, ACTIVE_DRAFT_ID))
+      .run();
   }
 
   selectPublication(publicationId: string): void {
@@ -225,7 +285,41 @@ export class WorkbenchRepository {
     this.replaceDraftStories(storyIds);
   }
 
-  savePublishingResult(draft: Draft, result: PublishingResult): void {
+  addOffer(offerId: string): void {
+    const draft = this.readActiveDraft();
+    if (draft.selectedOfferIds.includes(offerId)) {
+      return;
+    }
+
+    this.db.transaction((transaction) => {
+      transaction
+        .insert(draftOffers)
+        .values({
+          draftId: ACTIVE_DRAFT_ID,
+          offerId,
+          position: draft.selectedOfferIds.length,
+        })
+        .run();
+      transaction
+        .update(drafts)
+        .set({ updatedAt: new Date().toISOString() })
+        .where(eq(drafts.id, ACTIVE_DRAFT_ID))
+        .run();
+    });
+  }
+
+  removeOffer(offerId: string): void {
+    const draft = this.readActiveDraft();
+    const remainingOfferIds = draft.selectedOfferIds.filter((selectedOfferId) => selectedOfferId !== offerId);
+
+    if (remainingOfferIds.length === draft.selectedOfferIds.length) {
+      return;
+    }
+
+    this.replaceDraftOffers(remainingOfferIds);
+  }
+
+  savePublishingResult(draft: StoredDraft, result: PublishingResult): void {
     if (!draft.publicationId) {
       throw new Error("Publishing requires a selected publication.");
     }
@@ -274,7 +368,7 @@ export class WorkbenchRepository {
   }
 
   findPublishingResult(
-    draft: Draft,
+    draft: StoredDraft,
     storyId: string,
     provider: string,
     mode: PublishingMode,
@@ -300,7 +394,7 @@ export class WorkbenchRepository {
     return row ? asPublishingResult(row) : undefined;
   }
 
-  listPublishingResults(draft: Draft): PublishingResult[] {
+  listPublishingResults(draft: StoredDraft): PublishingResult[] {
     if (!draft.publicationId) {
       return [];
     }
@@ -334,6 +428,20 @@ export class WorkbenchRepository {
       transaction.delete(draftStories).where(eq(draftStories.draftId, ACTIVE_DRAFT_ID)).run();
       for (const [position, storyId] of storyIds.entries()) {
         transaction.insert(draftStories).values({ draftId: ACTIVE_DRAFT_ID, storyId, position }).run();
+      }
+      transaction
+        .update(drafts)
+        .set({ updatedAt: new Date().toISOString() })
+        .where(eq(drafts.id, ACTIVE_DRAFT_ID))
+        .run();
+    });
+  }
+
+  private replaceDraftOffers(offerIds: string[]): void {
+    this.db.transaction((transaction) => {
+      transaction.delete(draftOffers).where(eq(draftOffers.draftId, ACTIVE_DRAFT_ID)).run();
+      for (const [position, offerId] of offerIds.entries()) {
+        transaction.insert(draftOffers).values({ draftId: ACTIVE_DRAFT_ID, offerId, position }).run();
       }
       transaction
         .update(drafts)

@@ -34,8 +34,8 @@ Benzinga-shaped RSS fixtures
   -> WordPress publishing/resolution
        MockWordPress required/default
        RealWordPress optional later
-  -> operator selects a Mock Everflow-style offer
-  -> offer adapter provides tracking URL
+  -> operator selects zero or more Mock Everflow-style offers
+  -> offer adapter provides tracking URLs
   -> deterministic newsletter renderer
   -> exact HTML and plain-text preview
   -> human approval
@@ -70,7 +70,7 @@ The numeric site ID comes from the authenticated
 - Manual story selection and ordering.
 - `MockWordPress` as the required/default deterministic publisher; optional
   `RealWordPress` for one disposable WordPress.com test site after Milestone 3A.
-- A mock Everflow-style offer catalog and tracking URL.
+- A mock Everflow-style offer catalog and tracking URLs.
 - Deterministic newsletter HTML and plain-text rendering.
 - Exact preview, human approval, lightweight revision/approval protection, and
   duplicate-staging protection.
@@ -97,7 +97,7 @@ The POC demo succeeds only when it proves all applicable steps with visible,
 honest results:
 
 1. The same controlled fixture yields the same normalized stories.
-2. The single operator can select and order stories and select a mock offer.
+2. The single operator can select and order stories and select mock offers.
 3. Mock WordPress, Mock Everflow, and Mock Iterable each work independently
    and identify their own deterministic result.
 4. The renderer produces exact, deterministic HTML and plain-text previews.
