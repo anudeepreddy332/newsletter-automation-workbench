@@ -45,7 +45,8 @@ email send.
 | `RealWordPress` | Optional Milestone 3B adapter for one disposable WordPress.com test site using server-side credentials. | Access the target organization, support multiple sites, or silently fall back to Mock mode. |
 | Mock Everflow-style offer adapter | Provides a deterministic offer catalog and tracking URLs for operator choice of zero or more offers. | Call Everflow or select an offer automatically. |
 | Newsletter renderer | Produces deterministic HTML and plain text from explicitly selected inputs. | Invent editorial content or perform a send. |
-| Preview and approval boundary | Shows the exact render, records human approval, invalidates approval on edits, and prevents duplicate staging. | Treat a draft as approved without an explicit human action. |
+| Preview and approval boundary | Shows the exact render, records human approval bound to that snapshot, invalidates approval when generated output changes, and prevents duplicate staging. | Treat a draft as approved without an explicit human action, or stage rebuilt content after approval. |
+| `NewsletterStager` | Provider-neutral staging boundary for an approved snapshot. | Call Iterable, manage an audience, or send email. |
 | `MockIterable` | Stages an approved immutable snapshot and returns an idempotent receipt. | Call Iterable, manage an audience, or send email. |
 | Configuration/secret boundary | Selects adapters and keeps optional real WordPress credentials server-side. | Expose credentials to a browser/client or store them in fixtures. |
 
@@ -92,9 +93,13 @@ selection and persistence so it can be replaced later.
 ### Preview, approval, and staging
 
 The exact rendered HTML and plain text must be previewed before a human
-approves a snapshot. Any edit invalidates approval. `MockIterable` stages only
-an approved snapshot, guards against duplicate staging, and returns a visible
-receipt. It never sends email.
+approves a snapshot. Approval is a deliberate operator action and binds to the
+exact generated subject, preheader, HTML, plain text, and input fingerprint.
+Any later change that makes generated output stale invalidates that approval
+for staging. `NewsletterStager` is the provider-neutral staging boundary.
+`MockIterable` stages only the approved snapshot, guards against duplicate
+staging, and returns a visible receipt. It never sends email. The real
+Iterable contract remains unvalidated.
 
 ## Data flow and known boundary
 

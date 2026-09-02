@@ -1,7 +1,9 @@
+import type { ApprovedNewsletterSnapshot } from "@/src/domain/approval";
 import type { GeneratedNewsletter } from "@/src/domain/newsletter";
 import type { Offer } from "@/src/domain/offer";
 import type { Story } from "@/src/domain/story";
 import type { PublishingResult } from "@/src/publishing/content-publisher";
+import type { StagingResult } from "@/src/staging/newsletter-stager";
 
 export type Publication = {
   id: string;
@@ -24,4 +26,7 @@ export type WorkbenchState = {
   realWordPressConfigured: boolean;
   generatedNewsletter: GeneratedNewsletter | null;
   generatedNewsletterIsCurrent: boolean;
+  approvedNewsletter: ApprovedNewsletterSnapshot | null;
+  approvalIsCurrent: boolean;
+  stagingReceipt: StagingResult | null;
 };

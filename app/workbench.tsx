@@ -1,6 +1,8 @@
 import { publishSelectedStories, removeOffer, removeStory } from "@/app/actions";
 import { GeneratedNewsletterPanel } from "@/app/generated-newsletter";
 import { OfferPicker } from "@/app/offer-picker";
+import { ReviewApprovePanel } from "@/app/review-approve";
+import { StageIterablePanel } from "@/app/stage-iterable";
 import { StoryPicker } from "@/app/story-picker";
 import { formatStoryTimestamp } from "@/app/story-presentation";
 import type { WorkbenchState } from "@/src/domain/workbench";
@@ -108,7 +110,8 @@ export function Workbench({ state }: WorkbenchProps) {
         <div className="header-copy">
           <h1>Newsletter Builder</h1>
           <p className="header-description">
-            Choose stories and advertiser links, then generate a newsletter from that selection.
+            Choose stories and advertiser links, generate a newsletter, then review, approve, and
+            stage it.
           </p>
         </div>
         <div className="saved-indicator">
@@ -239,6 +242,23 @@ export function Workbench({ state }: WorkbenchProps) {
             canGenerate={canPrepare}
             generatedNewsletter={state.generatedNewsletter}
             generatedNewsletterIsCurrent={state.generatedNewsletterIsCurrent}
+          />
+
+          <ReviewApprovePanel
+            canApprove={
+              state.generatedNewsletter !== null &&
+              state.generatedNewsletterIsCurrent &&
+              selectedCount > 0 &&
+              !state.approvalIsCurrent
+            }
+            approvalIsCurrent={state.approvalIsCurrent}
+            generatedNewsletter={state.generatedNewsletter}
+            generatedNewsletterIsCurrent={state.generatedNewsletterIsCurrent}
+          />
+
+          <StageIterablePanel
+            canStage={state.approvalIsCurrent}
+            stagingReceipt={state.stagingReceipt}
           />
 
           <section className="workflow-panel preparation-panel" aria-labelledby="preparation-heading">

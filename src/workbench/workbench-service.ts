@@ -1,12 +1,18 @@
 import { MOCK_WORDPRESS_PROVIDER } from "@/src/adapters/publishing/mock-wordpress";
 import { REAL_WORDPRESS_PROVIDER } from "@/src/adapters/publishing/real-wordpress";
 import { mockEverflowOfferCatalog } from "@/src/adapters/offers/mock-everflow";
+import { MockIterable } from "@/src/adapters/staging/mock-iterable";
 import type { ContentSource } from "@/src/content/content-source";
 import type { Draft, WorkbenchState } from "@/src/domain/workbench";
 import type { OfferCatalog } from "@/src/domain/offer";
 import type { ContentFeed } from "@/src/domain/story";
 import { buildNewsletterAssemblyInput } from "@/src/newsletter/assembly";
-import { fingerprintNewsletterInput } from "@/src/newsletter/fingerprint";
+import {
+  approvedSnapshotFromGenerated,
+  fingerprintNewsletterInput,
+  isApprovedSnapshotConsistent,
+  isCurrentApproval,
+} from "@/src/newsletter/fingerprint";
 import { renderNewsletter } from "@/src/newsletter/renderer";
 import type {
   ContentPublisher,
@@ -16,7 +22,18 @@ import type {
 import { isBlockingPublishingResult } from "@/src/publishing/content-publisher";
 import { ContentRepository } from "@/src/repositories/content-repository";
 import { WorkbenchRepository, type StoredDraft } from "@/src/repositories/workbench-repository";
+import type { NewsletterStager, StagingResult } from "@/src/staging/newsletter-stager";
 import { INTERNAL_POC_PUBLICATION, POC_PUBLICATIONS } from "@/src/workbench/publications";
+
+type NewsletterContext = {
+  storedDraft: StoredDraft;
+  draft: Draft;
+  generatedNewsletter: WorkbenchState["generatedNewsletter"];
+  generatedNewsletterIsCurrent: boolean;
+  approvedNewsletter: WorkbenchState["approvedNewsletter"];
+  approvalIsCurrent: boolean;
+  stagingReceipt: StagingResult | null;
+};
 
 export class WorkbenchService {
   constructor(
@@ -26,27 +43,25 @@ export class WorkbenchService {
     private readonly mockPublisher: ContentPublisher,
     private readonly realPublisher: ContentPublisher | null = null,
     private readonly offerCatalog: OfferCatalog = mockEverflowOfferCatalog,
+    private readonly stager: NewsletterStager = new MockIterable(),
   ) {}
 
   async load(): Promise<WorkbenchState> {
     const contentFeed = await this.ensureFixtureContent();
     const storedDraft = this.ensureInternalPublication();
-    const draft = this.hydrateDraft(storedDraft);
-    const generatedNewsletter = this.workbenchRepository.readGeneratedNewsletter();
-    const publishingResults = this.workbenchRepository.listPublishingResults(storedDraft);
-    const inputFingerprint = fingerprintNewsletterInput(
-      buildNewsletterAssemblyInput(draft.selectedStories, draft.selectedOffers, publishingResults),
-    );
+    const context = this.readNewsletterContext(storedDraft);
     return {
       publications: this.workbenchRepository.listPublications(),
       availableStories: this.contentRepository.listStories(contentFeed.id),
       availableOffers: [...this.offerCatalog.list()],
-      draft,
-      publishingResults,
+      draft: context.draft,
+      publishingResults: this.workbenchRepository.listPublishingResults(storedDraft),
       realWordPressConfigured: this.realPublisher !== null,
-      generatedNewsletter,
-      generatedNewsletterIsCurrent:
-        generatedNewsletter !== null && generatedNewsletter.inputFingerprint === inputFingerprint,
+      generatedNewsletter: context.generatedNewsletter,
+      generatedNewsletterIsCurrent: context.generatedNewsletterIsCurrent,
+      approvedNewsletter: context.approvedNewsletter,
+      approvalIsCurrent: context.approvalIsCurrent,
+      stagingReceipt: context.stagingReceipt,
     };
   }
 
@@ -106,6 +121,80 @@ export class WorkbenchService {
       ...rendered,
       inputFingerprint: fingerprintNewsletterInput(input),
     });
+  }
+
+  async approveNewsletter(): Promise<void> {
+    await this.prepare();
+    const context = this.readNewsletterContext();
+    if (context.draft.selectedStories.length === 0) {
+      throw new WorkbenchServiceError(
+        "STORIES_REQUIRED",
+        "Select at least one story before approving a newsletter.",
+      );
+    }
+    if (!context.generatedNewsletter) {
+      throw new WorkbenchServiceError(
+        "NEWSLETTER_REQUIRED",
+        "Generate a newsletter before approving.",
+      );
+    }
+    if (!context.generatedNewsletterIsCurrent) {
+      throw new WorkbenchServiceError(
+        "NEWSLETTER_STALE",
+        "This generated newsletter is out of date. Generate again before approving.",
+      );
+    }
+
+    this.workbenchRepository.saveApprovedNewsletter(
+      approvedSnapshotFromGenerated(context.draft.id, context.generatedNewsletter),
+    );
+  }
+
+  async stageApprovedNewsletter(): Promise<StagingResult> {
+    await this.prepare();
+    const context = this.readNewsletterContext();
+    if (!context.generatedNewsletter) {
+      throw new WorkbenchServiceError(
+        "NEWSLETTER_REQUIRED",
+        "Generate and approve a newsletter before staging.",
+      );
+    }
+    if (!context.generatedNewsletterIsCurrent) {
+      throw new WorkbenchServiceError(
+        "NEWSLETTER_STALE",
+        "This generated newsletter is out of date. Generate, review, and approve again before staging.",
+      );
+    }
+    if (!context.approvedNewsletter) {
+      throw new WorkbenchServiceError(
+        "APPROVAL_REQUIRED",
+        "Approve the current newsletter before staging.",
+      );
+    }
+    if (!isApprovedSnapshotConsistent(context.approvedNewsletter)) {
+      throw new WorkbenchServiceError(
+        "APPROVAL_MISMATCH",
+        "The stored approval does not match the approved newsletter snapshot.",
+      );
+    }
+    if (!context.approvalIsCurrent) {
+      throw new WorkbenchServiceError(
+        "APPROVAL_STALE",
+        "The previous approval no longer matches this newsletter. Review and approve again before staging.",
+      );
+    }
+
+    const existing = this.workbenchRepository.findStagingReceipt(
+      context.approvedNewsletter.draftId,
+      context.approvedNewsletter.approvalFingerprint,
+      this.stager.provider,
+    );
+    if (existing) {
+      return existing;
+    }
+
+    const result = this.stager.stage(context.approvedNewsletter);
+    return this.workbenchRepository.saveStagingReceipt(context.approvedNewsletter.draftId, result);
   }
 
   async publishSelectedStories(mode: PublishingMode = "mock"): Promise<PublishingResult[]> {
@@ -232,6 +321,43 @@ export class WorkbenchService {
     return this.hydrateDraft(this.workbenchRepository.readActiveDraft());
   }
 
+  private readNewsletterContext(
+    storedDraft: StoredDraft = this.workbenchRepository.readActiveDraft(),
+  ): NewsletterContext {
+    const draft = this.hydrateDraft(storedDraft);
+    const generatedNewsletter = this.workbenchRepository.readGeneratedNewsletter();
+    const publishingResults = this.workbenchRepository.listPublishingResults(storedDraft);
+    const inputFingerprint = fingerprintNewsletterInput(
+      buildNewsletterAssemblyInput(draft.selectedStories, draft.selectedOffers, publishingResults),
+    );
+    const generatedNewsletterIsCurrent =
+      generatedNewsletter !== null && generatedNewsletter.inputFingerprint === inputFingerprint;
+    const approvedNewsletter = this.workbenchRepository.readApprovedNewsletter();
+    const approvalIsCurrent = isCurrentApproval(
+      generatedNewsletter,
+      generatedNewsletterIsCurrent,
+      approvedNewsletter,
+    );
+    const stagingReceipt =
+      approvalIsCurrent && approvedNewsletter
+        ? this.workbenchRepository.findStagingReceipt(
+            approvedNewsletter.draftId,
+            approvedNewsletter.approvalFingerprint,
+            this.stager.provider,
+          ) ?? null
+        : null;
+
+    return {
+      storedDraft,
+      draft,
+      generatedNewsletter,
+      generatedNewsletterIsCurrent,
+      approvedNewsletter,
+      approvalIsCurrent,
+      stagingReceipt,
+    };
+  }
+
   private hydrateDraft(stored: StoredDraft): Draft {
     return {
       id: stored.id,
@@ -265,7 +391,12 @@ export class WorkbenchServiceError extends Error {
       | "STORIES_REQUIRED"
       | "PUBLISHER_RESULT_MISMATCH"
       | "REAL_SINGLE_STORY_REQUIRED"
-      | "UNKNOWN_OFFER",
+      | "UNKNOWN_OFFER"
+      | "NEWSLETTER_REQUIRED"
+      | "NEWSLETTER_STALE"
+      | "APPROVAL_REQUIRED"
+      | "APPROVAL_STALE"
+      | "APPROVAL_MISMATCH",
     message: string,
   ) {
     super(message);

@@ -1,9 +1,11 @@
 import path from "node:path";
 
 import { BenzingaShapedFixtureSource } from "@/src/adapters/rss/benzinga-shaped-rss";
+import { mockEverflowOfferCatalog } from "@/src/adapters/offers/mock-everflow";
 import { MockWordPress } from "@/src/adapters/publishing/mock-wordpress";
 import { RealWordPress } from "@/src/adapters/publishing/real-wordpress";
 import { readRealWordPressConfig } from "@/src/adapters/publishing/wordpress-config";
+import { MockIterable } from "@/src/adapters/staging/mock-iterable";
 import { openContentDatabase } from "@/src/db/database";
 import { applyContentFoundationMigrations } from "@/src/db/migrate";
 import { ContentRepository } from "@/src/repositories/content-repository";
@@ -29,4 +31,6 @@ export const workbenchService = new WorkbenchService(
   new WorkbenchRepository(db),
   new MockWordPress(),
   realWordPressConfig ? new RealWordPress(realWordPressConfig) : null,
+  mockEverflowOfferCatalog,
+  new MockIterable(),
 );

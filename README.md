@@ -72,9 +72,10 @@ The numeric site ID comes from the authenticated
   `RealWordPress` for one disposable WordPress.com test site after Milestone 3A.
 - A mock Everflow-style offer catalog and tracking URLs.
 - Deterministic newsletter HTML and plain-text rendering.
-- Exact preview, human approval, lightweight revision/approval protection, and
-  duplicate-staging protection.
-- Stage-only `MockIterable` destination with a visible delivery receipt.
+- Exact preview, human approval of that exact snapshot, approval invalidation
+  when generated output changes, and duplicate-staging protection.
+- Stage-only `MockIterable` destination with a visible delivery receipt. Staging
+  prepares a mock draft; it does not send email.
 - SQLite persistence.
 
 ## Explicit exclusions

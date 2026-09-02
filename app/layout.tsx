@@ -4,7 +4,7 @@ import "@/app/globals.css";
 
 export const metadata: Metadata = {
   title: "Newsletter Builder",
-  description: "Build and prepare a newsletter from sample stories.",
+  description: "Build, review, approve, and stage a newsletter from sample stories.",
 };
 
 export default function RootLayout({

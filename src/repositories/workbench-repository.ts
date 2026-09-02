@@ -2,17 +2,21 @@ import { and, asc, eq } from "drizzle-orm";
 
 import type { ContentDatabase } from "@/src/db/database";
 import {
+  approvedNewsletters,
   draftOffers,
   draftStories,
   drafts,
   publications,
   publishingResults,
+  stagingReceipts,
   stories,
 } from "@/src/db/schema";
+import type { ApprovedNewsletterSnapshot } from "@/src/domain/approval";
 import type { GeneratedNewsletter } from "@/src/domain/newsletter";
 import type { Publication } from "@/src/domain/workbench";
 import type { Story } from "@/src/domain/story";
 import type { PublishingMode, PublishingResult } from "@/src/publishing/content-publisher";
+import type { StagingResult } from "@/src/staging/newsletter-stager";
 
 const ACTIVE_DRAFT_ID = "draft_active_poc";
 
@@ -60,6 +64,31 @@ function asPublishingMode(value: string): PublishingMode {
     return value;
   }
   throw new Error("A stored publishing result has an invalid mode.");
+}
+
+function asApprovedNewsletter(row: typeof approvedNewsletters.$inferSelect): ApprovedNewsletterSnapshot {
+  return {
+    draftId: row.draftId,
+    approvalFingerprint: row.approvalFingerprint,
+    generatedInputFingerprint: row.generatedInputFingerprint,
+    subject: row.subject,
+    preheader: row.preheader,
+    html: row.html,
+    plainText: row.plainText,
+  };
+}
+
+function asStagingResult(row: typeof stagingReceipts.$inferSelect): StagingResult {
+  if (row.status !== "staged") {
+    throw new Error("A stored staging receipt has an invalid status.");
+  }
+
+  return {
+    provider: row.provider,
+    status: "staged",
+    externalDraftId: row.externalDraftId,
+    approvalFingerprint: row.approvalFingerprint,
+  };
 }
 
 function asPublishingResult(row: typeof publishingResults.$inferSelect): PublishingResult {
@@ -201,6 +230,81 @@ export class WorkbenchRepository {
       })
       .where(eq(drafts.id, ACTIVE_DRAFT_ID))
       .run();
+  }
+
+  readApprovedNewsletter(): ApprovedNewsletterSnapshot | null {
+    const row = this.db
+      .select()
+      .from(approvedNewsletters)
+      .where(eq(approvedNewsletters.draftId, ACTIVE_DRAFT_ID))
+      .get();
+
+    return row ? asApprovedNewsletter(row) : null;
+  }
+
+  saveApprovedNewsletter(snapshot: ApprovedNewsletterSnapshot): void {
+    this.readActiveDraft();
+    this.db
+      .insert(approvedNewsletters)
+      .values({
+        draftId: snapshot.draftId,
+        approvalFingerprint: snapshot.approvalFingerprint,
+        generatedInputFingerprint: snapshot.generatedInputFingerprint,
+        subject: snapshot.subject,
+        preheader: snapshot.preheader,
+        html: snapshot.html,
+        plainText: snapshot.plainText,
+      })
+      .onConflictDoUpdate({
+        target: approvedNewsletters.draftId,
+        set: {
+          approvalFingerprint: snapshot.approvalFingerprint,
+          generatedInputFingerprint: snapshot.generatedInputFingerprint,
+          subject: snapshot.subject,
+          preheader: snapshot.preheader,
+          html: snapshot.html,
+          plainText: snapshot.plainText,
+        },
+      })
+      .run();
+  }
+
+  findStagingReceipt(
+    draftId: string,
+    approvalFingerprint: string,
+    provider: string,
+  ): StagingResult | undefined {
+    const row = this.db
+      .select()
+      .from(stagingReceipts)
+      .where(
+        and(
+          eq(stagingReceipts.draftId, draftId),
+          eq(stagingReceipts.approvalFingerprint, approvalFingerprint),
+          eq(stagingReceipts.provider, provider),
+        ),
+      )
+      .get();
+
+    return row ? asStagingResult(row) : undefined;
+  }
+
+  saveStagingReceipt(draftId: string, result: StagingResult): StagingResult {
+    this.db
+      .insert(stagingReceipts)
+      .values({
+        draftId,
+        approvalFingerprint: result.approvalFingerprint,
+        provider: result.provider,
+        status: result.status,
+        externalDraftId: result.externalDraftId,
+      })
+      .onConflictDoNothing()
+      .run();
+
+    return (
+      this.findStagingReceipt(draftId, result.approvalFingerprint, result.provider) ?? result
+    );
   }
 
   selectPublication(publicationId: string): void {

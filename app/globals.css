@@ -143,6 +143,8 @@ code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
 .offer-selection-panel { background: var(--surface); }
 .selected-offers-panel { background: #f7f8f4; }
 .generate-panel { background: var(--surface); }
+.review-panel { background: #fbfcfa; }
+.stage-panel { background: var(--surface-subtle); }
 .preparation-panel { background: #fbfcfa; }
 
 .panel-heading { margin-bottom: 20px; }
@@ -531,6 +533,28 @@ select:hover { border-color: #9caaa1; }
 
 .generated-newsletter { margin-top: 18px; }
 
+.review-hint { margin-top: 0; }
+
+.approval-status {
+  margin: 14px 0 0;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.staging-receipt {
+  margin-top: 18px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface);
+}
+
+.review-panel form,
+.stage-panel form {
+  margin-top: 16px;
+}
+
 .generated-meta {
   margin: 16px 0 0;
 }
@@ -830,7 +854,8 @@ select:hover { border-color: #9caaa1; }
   .story-detail-actions form,
   .story-detail-actions .button,
   .offer-detail-card form,
-  .offer-detail-card .button { width: 100%; }
+  .offer-detail-card .button,
+  .prepare-button { width: 100%; }
   .story-detail-card { padding: 16px; }
 
   .selected-story-item {

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -351,23 +351,3 @@ test("generated newsletter persists and is marked stale after selection changes"
     assert.equal(afterStoryChange.generatedNewsletterIsCurrent, false);
   });
 });
-
-test("no Phase 5 approval or Iterable behavior exists", () => {
-  const roots = ["app", "src"];
-  const files = roots.flatMap((root) => collectSourceFiles(path.join(process.cwd(), root)));
-
-  for (const filePath of files) {
-    const source = readFileSync(filePath, "utf8");
-    assert.doesNotMatch(source, /MockIterable|stageToIterable|approveNewsletter|Iterable staging/);
-  }
-});
-
-function collectSourceFiles(directory: string): string[] {
-  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const resolved = path.join(directory, entry.name);
-    if (entry.isDirectory()) {
-      return collectSourceFiles(resolved);
-    }
-    return /\.(ts|tsx)$/.test(entry.name) ? [resolved] : [];
-  });
-}

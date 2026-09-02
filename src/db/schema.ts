@@ -91,3 +91,33 @@ export const publishingResults = sqliteTable(
     }),
   ],
 );
+
+export const approvedNewsletters = sqliteTable("approved_newsletters", {
+  draftId: text("draft_id")
+    .primaryKey()
+    .references(() => drafts.id, { onDelete: "cascade" }),
+  approvalFingerprint: text("approval_fingerprint").notNull(),
+  generatedInputFingerprint: text("generated_input_fingerprint").notNull(),
+  subject: text("subject").notNull(),
+  preheader: text("preheader").notNull(),
+  html: text("html").notNull(),
+  plainText: text("plain_text").notNull(),
+});
+
+export const stagingReceipts = sqliteTable(
+  "staging_receipts",
+  {
+    draftId: text("draft_id")
+      .notNull()
+      .references(() => drafts.id, { onDelete: "cascade" }),
+    approvalFingerprint: text("approval_fingerprint").notNull(),
+    provider: text("provider").notNull(),
+    status: text("status").notNull(),
+    externalDraftId: text("external_draft_id").notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.draftId, table.approvalFingerprint, table.provider],
+    }),
+  ],
+);

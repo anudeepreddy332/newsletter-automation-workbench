@@ -33,48 +33,16 @@ export function GeneratedNewsletterPanel({
       </p>
 
       {generatedNewsletter ? (
-        <div className="generated-newsletter" aria-live="polite">
-          {!generatedNewsletterIsCurrent ? (
-            <p className="stale-banner" role="status">
-              This generated newsletter is out of date. Generate again from the current stories and
-              advertiser links.
-            </p>
-          ) : (
-            <p className="preparation-summary" role="status">
-              <strong>This is the newsletter assembled from what you selected.</strong>
-            </p>
-          )}
-
-          <dl className="generated-meta">
-            <div>
-              <dt>Subject</dt>
-              <dd>{generatedNewsletter.subject}</dd>
-            </div>
-            <div>
-              <dt>Preheader</dt>
-              <dd>{generatedNewsletter.preheader}</dd>
-            </div>
-          </dl>
-
-          <div className="newsletter-preview-frame">
-            <h3>Preview</h3>
-            <iframe
-              className="newsletter-frame"
-              title="Generated newsletter preview"
-              sandbox=""
-              srcDoc={generatedNewsletter.html}
-            />
-          </div>
-
-          <details className="generated-evidence">
-            <summary>HTML</summary>
-            <pre>{generatedNewsletter.html}</pre>
-          </details>
-          <details className="generated-evidence">
-            <summary>Plain text</summary>
-            <pre>{generatedNewsletter.plainText}</pre>
-          </details>
-        </div>
+        generatedNewsletterIsCurrent ? (
+          <p className="preparation-summary" role="status">
+            <strong>A current newsletter is ready to review.</strong>
+          </p>
+        ) : (
+          <p className="stale-banner" role="status">
+            This generated newsletter is out of date. Generate again from the current stories and
+            advertiser links.
+          </p>
+        )
       ) : null}
     </section>
   );

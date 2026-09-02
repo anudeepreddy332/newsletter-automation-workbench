@@ -245,11 +245,13 @@ test("a legacy local draft is reassigned safely while its prior results remain v
   });
 });
 
-test("the operator UI is vertical with story, advertiser, and generate steps", () => {
+test("the operator UI is vertical with story, advertiser, generate, review, and stage steps", () => {
   const workbenchSource = readFileSync(path.join(process.cwd(), "app/workbench.tsx"), "utf8");
   const storyPickerSource = readFileSync(path.join(process.cwd(), "app/story-picker.tsx"), "utf8");
   const offerPickerSource = readFileSync(path.join(process.cwd(), "app/offer-picker.tsx"), "utf8");
   const generatedSource = readFileSync(path.join(process.cwd(), "app/generated-newsletter.tsx"), "utf8");
+  const reviewSource = readFileSync(path.join(process.cwd(), "app/review-approve.tsx"), "utf8");
+  const stageSource = readFileSync(path.join(process.cwd(), "app/stage-iterable.tsx"), "utf8");
   const actionsSource = readFileSync(path.join(process.cwd(), "app/actions.ts"), "utf8");
 
   assert.doesNotMatch(workbenchSource, /publicationId|selectPublication|Save choice/);
@@ -261,6 +263,13 @@ test("the operator UI is vertical with story, advertiser, and generate steps", (
   assert.match(workbenchSource, /Stories added/);
   assert.match(workbenchSource, /Advertiser links added/);
   assert.match(generatedSource, /3\. Generate newsletter/);
+  assert.match(reviewSource, /4\. Review and approve/);
+  assert.match(reviewSource, /Approve newsletter/);
+  assert.match(reviewSource, /Status: \{approvalIsCurrent \? "Approved" : "Not approved"\}/);
+  assert.match(stageSource, /5\. Stage to Iterable/);
+  assert.match(stageSource, /simulated Iterable destination/);
+  assert.match(stageSource, /Stage approved newsletter/);
+  assert.doesNotMatch(stageSource, /\bSent\b|Delivered|Campaign launched/);
   assert.match(offerPickerSource, /Add advertiser link/);
   assert.match(offerPickerSource, /Sample tracking URL/);
   assert.doesNotMatch(offerPickerSource, /<a(?:\s|>)|href=/);
@@ -269,9 +278,10 @@ test("the operator UI is vertical with story, advertiser, and generate steps", (
   assert.match(storyPickerSource, /selectedStory\?\.body/);
   assert.doesNotMatch(storyPickerSource, /— in newsletter|In newsletter/);
   assert.doesNotMatch(storyPickerSource, /<a(?:\s|>)|href=/);
-  assert.doesNotMatch(workbenchSource, /Iterable|Everflow|afterStoryId|relevance score/);
+  assert.doesNotMatch(workbenchSource, /Everflow|afterStoryId|relevance score/);
   assert.doesNotMatch(generatedSource, /Iterable|approve|Approval/);
-  assert.doesNotMatch(actionsSource, /Iterable|approveNewsletter|stageToIterable/);
+  assert.match(actionsSource, /approveNewsletter/);
+  assert.match(actionsSource, /stageApprovedNewsletter/);
   assert.match(workbenchSource, /REAL WORDPRESS\.COM TEST SITE/);
   assert.match(workbenchSource, /result\.sourceStoryId === story\.id/);
   assert.doesNotMatch(workbenchSource, /WORDPRESS_ACCESS_TOKEN|name="accessToken"|name="siteId"|type="password"/);
@@ -593,6 +603,7 @@ test("runtime wiring never exposes WordPress credentials to the client module gr
   assert.doesNotMatch(runtimeSource, /NEXT_PUBLIC_WORDPRESS/);
   assert.match(runtimeSource, /readRealWordPressConfig/);
   assert.match(runtimeSource, /new MockWordPress\(\)/);
+  assert.match(runtimeSource, /new MockIterable\(\)/);
   assert.doesNotMatch(actionsSource, /WORDPRESS_ACCESS_TOKEN|WORDPRESS_SITE_ID/);
   assert.match(workbenchSource, /mode" value="mock"/);
   assert.match(workbenchSource, /mode" value="real"/);

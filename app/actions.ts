@@ -52,3 +52,13 @@ export async function generateNewsletter(): Promise<void> {
   await workbenchService.generateNewsletter();
   revalidatePath("/");
 }
+
+export async function approveNewsletter(): Promise<void> {
+  await workbenchService.approveNewsletter();
+  revalidatePath("/");
+}
+
+export async function stageApprovedNewsletter(): Promise<void> {
+  await workbenchService.stageApprovedNewsletter();
+  revalidatePath("/");
+}
