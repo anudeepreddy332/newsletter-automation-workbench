@@ -4,9 +4,15 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
+import { eq } from "drizzle-orm";
+
 import { BenzingaShapedFixtureSource } from "@/src/adapters/rss/benzinga-shaped-rss";
+import type { ContentSource } from "@/src/content/content-source";
 import { openContentDatabase } from "@/src/db/database";
 import { applyContentFoundationMigrations } from "@/src/db/migrate";
+import type { ContentDatabase } from "@/src/db/database";
+import { contentFeeds } from "@/src/db/schema";
+import type { ContentFeed, Story } from "@/src/domain/story";
 import { ContentRepository } from "@/src/repositories/content-repository";
 import {
   WorkbenchRepository,
@@ -24,18 +30,25 @@ const secondStoryId = "story_5c6a67b4a9b7cb360ddc7877";
 async function withWorkbench(
   run: (service: WorkbenchService) => Promise<void>,
 ): Promise<void> {
+  await withContentSource(new BenzingaShapedFixtureSource(fixturePath), run);
+}
+
+async function withContentSource(
+  contentSource: ContentSource,
+  run: (service: WorkbenchService, db: ContentDatabase) => Promise<void>,
+): Promise<void> {
   const temporaryDirectory = mkdtempSync(path.join(tmpdir(), "newsletter-workbench-"));
   const databasePath = path.join(temporaryDirectory, "workbench.db");
   const { client, db } = openContentDatabase(databasePath);
   applyContentFoundationMigrations(db);
   const service = new WorkbenchService(
-    new BenzingaShapedFixtureSource(fixturePath),
+    contentSource,
     new ContentRepository(db),
     new WorkbenchRepository(db),
   );
 
   try {
-    await run(service);
+    await run(service, db);
   } finally {
     client.close();
     rmSync(temporaryDirectory, { recursive: true, force: true });
@@ -155,5 +168,43 @@ test("content feeds and publications stay distinct concepts", async () => {
       state.publications.map((publication) => publication.id),
       ["publication_daily_dispatch", "publication_market_brief"],
     );
+  });
+});
+
+test("workbench loads stories from the content feed returned by its source", async () => {
+  const alternateContentFeed: ContentFeed = {
+    id: "content_feed_controlled_alternate",
+    name: "Controlled alternate feed",
+    sourceKind: "rss",
+  };
+  const alternateStory: Story = {
+    id: "story_controlled_alternate",
+    contentFeedId: alternateContentFeed.id,
+    title: "Controlled alternate story",
+    summary: "A story returned by the controlled alternate content source.",
+    canonicalUrl: "https://fixture.example.test/news/controlled-alternate-story",
+    publishedAt: "2026-09-02T06:00:00.000Z",
+  };
+  const alternateSource: ContentSource = {
+    async read() {
+      return { contentFeed: alternateContentFeed, stories: [alternateStory] };
+    },
+  };
+
+  await withContentSource(alternateSource, async (service, db) => {
+    const state = await service.load();
+
+    assert.deepEqual(
+      db.select().from(contentFeeds).where(eq(contentFeeds.id, alternateContentFeed.id)).get(),
+      alternateContentFeed,
+    );
+    assert.deepEqual(state.availableStories, [
+      {
+        ...alternateStory,
+        imageUrl: undefined,
+        sourceAuthor: undefined,
+        sourceItemId: undefined,
+      },
+    ]);
   });
 });
