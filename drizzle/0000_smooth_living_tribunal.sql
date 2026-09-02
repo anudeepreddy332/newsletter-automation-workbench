@@ -1,4 +1,4 @@
-CREATE TABLE `publications` (
+CREATE TABLE `content_feeds` (
 	`id` text PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
 	`source_kind` text NOT NULL
@@ -6,7 +6,7 @@ CREATE TABLE `publications` (
 --> statement-breakpoint
 CREATE TABLE `stories` (
 	`id` text PRIMARY KEY NOT NULL,
-	`publication_id` text NOT NULL,
+	`content_feed_id` text NOT NULL,
 	`title` text NOT NULL,
 	`summary` text NOT NULL,
 	`canonical_url` text NOT NULL,
@@ -15,7 +15,7 @@ CREATE TABLE `stories` (
 	`source_author` text,
 	`source_item_id` text,
 	`created_at` text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-	FOREIGN KEY (`publication_id`) REFERENCES `publications`(`id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`content_feed_id`) REFERENCES `content_feeds`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `stories_canonical_url_unique` ON `stories` (`canonical_url`);

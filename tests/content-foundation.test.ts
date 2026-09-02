@@ -22,13 +22,13 @@ test("RSS fixture parsing returns the expected normalized stories", async () => 
   const source = new BenzingaShapedFixtureSource(fixturePath);
   const batch = await source.read();
 
-  assert.equal(batch.publication.id, "publication_benzinga_shaped_fixture");
+  assert.equal(batch.contentFeed.id, "content_feed_benzinga_shaped_fixture");
   assert.equal(batch.stories.length, 2);
   const firstStory = batch.stories[0];
   assert.ok(firstStory);
   assert.deepEqual(firstStory, {
     id: "story_6c43c8a1944281017858d68b",
-    publicationId: "publication_benzinga_shaped_fixture",
+    contentFeedId: "content_feed_benzinga_shaped_fixture",
     title: "Aurora Grid Reports Higher Storage Orders",
     summary:
       "Aurora Grid said quarterly storage orders rose after a fictional utility contract.",
@@ -56,6 +56,45 @@ test("optional image and author values do not crash normalization", () => {
   assert.equal(batch.stories[1]?.title, "Northline Retail Updates Its Seasonal Outlook");
 });
 
+test("valid HTTPS URLs pass normalization", () => {
+  const batch = parseBenzingaShapedRss(readFileSync(fixturePath, "utf8"));
+
+  assert.equal(
+    batch.stories[0]?.canonicalUrl,
+    "https://fixture.example.test/news/aurora-grid-storage-orders",
+  );
+});
+
+test("HTTP content URLs are rejected clearly", () => {
+  const httpUrlFixture = readFileSync(fixturePath, "utf8").replace(
+    "https://fixture.example.test/news/aurora-grid-storage-orders",
+    "http://fixture.example.test/news/aurora-grid-storage-orders",
+  );
+
+  assert.throws(
+    () => parseBenzingaShapedRss(httpUrlFixture),
+    (error: unknown) =>
+      error instanceof ContentSourceError &&
+      error.code === "INVALID_ITEM" &&
+      error.message === "RSS item 1 canonical URL must use HTTPS.",
+  );
+});
+
+test("malformed content URLs are rejected clearly", () => {
+  const malformedUrlFixture = readFileSync(fixturePath, "utf8").replace(
+    "https://fixture.example.test/news/aurora-grid-storage-orders",
+    "not a URL",
+  );
+
+  assert.throws(
+    () => parseBenzingaShapedRss(malformedUrlFixture),
+    (error: unknown) =>
+      error instanceof ContentSourceError &&
+      error.code === "INVALID_ITEM" &&
+      error.message === "RSS item 1 has an invalid canonical URL.",
+  );
+});
+
 test("malformed RSS fails with a sanitized content-source error", () => {
   const malformedXml = readFileSync(
     path.join(process.cwd(), "tests/fixtures/malformed-rss.xml"),
@@ -81,10 +120,10 @@ test("normalized stories persist and reload without identifier corruption", () =
     applyContentFoundationMigrations(db);
     const repository = new ContentRepository(db);
 
-    repository.savePublication(batch.publication);
+    repository.saveContentFeed(batch.contentFeed);
     repository.saveStories(batch.stories);
 
-    assert.deepEqual(repository.listStories(batch.publication.id), [
+    assert.deepEqual(repository.listStories(batch.contentFeed.id), [
       ...batch.stories,
     ].sort((left, right) => left.id.localeCompare(right.id)));
 

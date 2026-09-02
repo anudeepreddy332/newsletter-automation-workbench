@@ -1,21 +1,21 @@
 import { asc, eq } from "drizzle-orm";
 
 import type { ContentDatabase } from "@/src/db/database";
-import { publications, stories } from "@/src/db/schema";
-import type { Publication, Story } from "@/src/domain/story";
+import { contentFeeds, stories } from "@/src/db/schema";
+import type { ContentFeed, Story } from "@/src/domain/story";
 
 export class ContentRepository {
   constructor(private readonly db: ContentDatabase) {}
 
-  savePublication(publication: Publication): void {
+  saveContentFeed(contentFeed: ContentFeed): void {
     this.db
-      .insert(publications)
-      .values(publication)
+      .insert(contentFeeds)
+      .values(contentFeed)
       .onConflictDoUpdate({
-        target: publications.id,
+        target: contentFeeds.id,
         set: {
-          name: publication.name,
-          sourceKind: publication.sourceKind,
+          name: contentFeed.name,
+          sourceKind: contentFeed.sourceKind,
         },
       })
       .run();
@@ -47,11 +47,11 @@ export class ContentRepository {
     }
   }
 
-  listStories(publicationId: string): Story[] {
+  listStories(contentFeedId: string): Story[] {
     return this.db
       .select({
         id: stories.id,
-        publicationId: stories.publicationId,
+        contentFeedId: stories.contentFeedId,
         title: stories.title,
         summary: stories.summary,
         canonicalUrl: stories.canonicalUrl,
@@ -61,7 +61,7 @@ export class ContentRepository {
         sourceItemId: stories.sourceItemId,
       })
       .from(stories)
-      .where(eq(stories.publicationId, publicationId))
+      .where(eq(stories.contentFeedId, contentFeedId))
       .orderBy(asc(stories.id))
       .all()
       .map((story) => ({

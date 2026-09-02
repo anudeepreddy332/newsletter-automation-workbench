@@ -6,12 +6,12 @@ import { XMLParser, XMLValidator } from "fast-xml-parser";
 import { ContentSourceError, type ContentSource } from "@/src/content/content-source";
 import type {
   NormalizedContentBatch,
-  Publication,
+  ContentFeed,
   Story,
 } from "@/src/domain/story";
 
-const BENZINGA_SHAPED_PUBLICATION: Publication = {
-  id: "publication_benzinga_shaped_fixture",
+const BENZINGA_SHAPED_CONTENT_FEED: ContentFeed = {
+  id: "content_feed_benzinga_shaped_fixture",
   name: "Benzinga-shaped financial-news fixture",
   sourceKind: "rss",
 };
@@ -83,14 +83,20 @@ function requireText(value: unknown, field: string, index: number): string {
   return text;
 }
 
-function validHttpUrl(value: string, field: string, index: number): string {
+function validHttpsUrl(value: string, field: string, index: number): string {
   try {
     const url = new URL(value);
-    if (url.protocol !== "https:" && url.protocol !== "http:") {
-      throw new Error("Unsupported protocol");
+    if (url.protocol !== "https:") {
+      throw new ContentSourceError(
+        "INVALID_ITEM",
+        `RSS item ${index + 1} ${field} URL must use HTTPS.`,
+      );
     }
     return url.toString();
-  } catch {
+  } catch (error) {
+    if (error instanceof ContentSourceError) {
+      throw error;
+    }
     throw new ContentSourceError(
       "INVALID_ITEM",
       `RSS item ${index + 1} has an invalid ${field} URL.`,
@@ -101,7 +107,7 @@ function validHttpUrl(value: string, field: string, index: number): string {
 function optionalImageUrl(value: unknown, index: number): string | undefined {
   const candidate = value as { url?: unknown } | undefined;
   const url = asString(candidate?.url);
-  return url ? validHttpUrl(url, "image", index) : undefined;
+  return url ? validHttpsUrl(url, "image", index) : undefined;
 }
 
 function normalizeItem(item: RawRssItem, index: number): Story {
@@ -116,7 +122,7 @@ function normalizeItem(item: RawRssItem, index: number): Story {
     );
   }
 
-  const canonicalUrl = validHttpUrl(
+  const canonicalUrl = validHttpsUrl(
     requireText(item.link, "link", index),
     "canonical",
     index,
@@ -135,7 +141,7 @@ function normalizeItem(item: RawRssItem, index: number): Story {
 
   return {
     id: `story_${createHash("sha256").update(idSeed).digest("hex").slice(0, 24)}`,
-    publicationId: BENZINGA_SHAPED_PUBLICATION.id,
+    contentFeedId: BENZINGA_SHAPED_CONTENT_FEED.id,
     title,
     summary,
     canonicalUrl,
@@ -169,7 +175,7 @@ export function parseBenzingaShapedRss(xml: string): NormalizedContentBatch {
   }
 
   return {
-    publication: BENZINGA_SHAPED_PUBLICATION,
+    contentFeed: BENZINGA_SHAPED_CONTENT_FEED,
     stories: items.map(normalizeItem),
   };
 }

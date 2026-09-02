@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { sqliteTable, text } from "drizzle-orm/sqlite-core";
 
-export const publications = sqliteTable("publications", {
+export const contentFeeds = sqliteTable("content_feeds", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   sourceKind: text("source_kind").notNull(),
@@ -9,9 +9,9 @@ export const publications = sqliteTable("publications", {
 
 export const stories = sqliteTable("stories", {
   id: text("id").primaryKey(),
-  publicationId: text("publication_id")
+  contentFeedId: text("content_feed_id")
     .notNull()
-    .references(() => publications.id),
+    .references(() => contentFeeds.id),
   title: text("title").notNull(),
   summary: text("summary").notNull(),
   canonicalUrl: text("canonical_url").notNull().unique(),

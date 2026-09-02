@@ -1,4 +1,4 @@
-export type Publication = {
+export type ContentFeed = {
   id: string;
   name: string;
   sourceKind: "rss";
@@ -6,7 +6,7 @@ export type Publication = {
 
 export type Story = {
   id: string;
-  publicationId: string;
+  contentFeedId: string;
   title: string;
   summary: string;
   canonicalUrl: string;
@@ -17,6 +17,6 @@ export type Story = {
 };
 
 export type NormalizedContentBatch = {
-  publication: Publication;
+  contentFeed: ContentFeed;
   stories: Story[];
 };
