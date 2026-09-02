@@ -2,6 +2,8 @@ import path from "node:path";
 
 import { BenzingaShapedFixtureSource } from "@/src/adapters/rss/benzinga-shaped-rss";
 import { MockWordPress } from "@/src/adapters/publishing/mock-wordpress";
+import { RealWordPress } from "@/src/adapters/publishing/real-wordpress";
+import { readRealWordPressConfig } from "@/src/adapters/publishing/wordpress-config";
 import { openContentDatabase } from "@/src/db/database";
 import { applyContentFoundationMigrations } from "@/src/db/migrate";
 import { ContentRepository } from "@/src/repositories/content-repository";
@@ -19,9 +21,12 @@ const { db } = openContentDatabase(databasePath);
 
 applyContentFoundationMigrations(db);
 
+const realWordPressConfig = readRealWordPressConfig();
+
 export const workbenchService = new WorkbenchService(
   new BenzingaShapedFixtureSource(fixturePath),
   new ContentRepository(db),
   new WorkbenchRepository(db),
   new MockWordPress(),
+  realWordPressConfig ? new RealWordPress(realWordPressConfig) : null,
 );

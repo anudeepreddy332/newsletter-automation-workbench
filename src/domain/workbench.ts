@@ -17,4 +17,5 @@ export type WorkbenchState = {
   availableStories: Story[];
   draft: Draft;
   publishingResults: PublishingResult[];
+  realWordPressConfigured: boolean;
 };

@@ -523,6 +523,34 @@ select:hover { border-color: #9caaa1; }
   letter-spacing: 0.09em;
 }
 
+.real-badge {
+  padding: 4px 7px;
+  border: 1px solid #cfc0ea;
+  border-radius: 6px;
+  background: #f4eefc;
+  color: #5b3d9c;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+}
+
+.publishing-mode.real-mode {
+  margin-top: 18px;
+}
+
+.publishing-mode.is-disabled {
+  opacity: 0.72;
+}
+
+.button-real {
+  background: #5b3d9c;
+  color: #fff;
+}
+
+.button-real:hover:not(:disabled) {
+  background: #4a2f82;
+}
+
 .prepare-button { width: 100%; }
 
 .preparation-hint {
@@ -586,6 +614,7 @@ select:hover { border-color: #9caaa1; }
 .status-badge { padding: 3px 7px; border-radius: 999px; }
 .status-badge.is-ready { background: var(--brand-soft); color: var(--brand); }
 .status-badge.is-failed { background: var(--danger-soft); color: var(--danger); }
+.status-badge.is-unknown { background: var(--accent-soft); color: var(--warning); }
 
 .status-dot {
   width: 6px;
@@ -629,6 +658,11 @@ select:hover { border-color: #9caaa1; }
 }
 
 .result-metadata code { font-size: 10px; }
+.result-url-link {
+  color: var(--brand);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
 .result-diagnostic { margin: 9px 0 0; color: var(--danger); font-size: 11px; }
 
 .app-footer {

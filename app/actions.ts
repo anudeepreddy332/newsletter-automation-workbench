@@ -32,7 +32,8 @@ export async function moveStoryDown(formData: FormData): Promise<void> {
   revalidatePath("/");
 }
 
-export async function publishSelectedStories(): Promise<void> {
-  await workbenchService.publishSelectedStories();
+export async function publishSelectedStories(formData: FormData): Promise<void> {
+  const mode = formData.get("mode") === "real" ? "real" : "mock";
+  await workbenchService.publishSelectedStories(mode);
   revalidatePath("/");
 }

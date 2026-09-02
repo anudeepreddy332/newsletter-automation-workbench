@@ -12,15 +12,42 @@ function providerLabel(provider: string): string {
   return provider === "MockWordPress" ? "Mock WordPress" : provider;
 }
 
+function resultStatusLabel(result: PublishingResult): string {
+  if (result.status === "published") {
+    return result.mode === "real" ? "Published" : "Ready";
+  }
+  if (result.status === "unknown") {
+    return "Unknown";
+  }
+  return "Failed";
+}
+
+function resultStatusClass(result: PublishingResult): string {
+  if (result.status === "published") {
+    return "is-ready";
+  }
+  if (result.status === "unknown") {
+    return "is-unknown";
+  }
+  return "is-failed";
+}
+
+function isClickableRealUrl(result: Extract<PublishingResult, { status: "published" }>): boolean {
+  return result.mode === "real" && /^https:\/\//i.test(result.url);
+}
+
 function PublishingResultCard({ result }: { result: PublishingResult }) {
   return (
     <div className="result-details">
       <div className="result-status-row">
-        <span className={`status-badge ${result.status === "published" ? "is-ready" : "is-failed"}`}>
+        <span className={`status-badge ${resultStatusClass(result)}`}>
           <span className="status-dot" aria-hidden="true" />
-          {result.status === "published" ? "Ready" : "Failed"}
+          {resultStatusLabel(result)}
         </span>
-        <span className="provider-label">{providerLabel(result.provider)} · Mock mode</span>
+        <span className="provider-label">
+          {result.mode === "real" ? "REAL" : "MOCK"} · {providerLabel(result.provider)}
+          {result.mode === "real" ? "" : " · Mock mode"}
+        </span>
       </div>
       {result.status === "published" ? (
         <dl className="result-metadata">
@@ -29,8 +56,21 @@ function PublishingResultCard({ result }: { result: PublishingResult }) {
             <dd><code>{result.externalPostId}</code></dd>
           </div>
           <div>
-            <dt>Mock URL</dt>
-            <dd><code>{result.url}</code></dd>
+            <dt>{result.mode === "real" ? "URL" : "Mock URL"}</dt>
+            <dd>
+              {isClickableRealUrl(result) ? (
+                <a
+                  className="result-url-link"
+                  href={result.url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {result.url}
+                </a>
+              ) : (
+                <code>{result.url}</code>
+              )}
+            </dd>
           </div>
         </dl>
       ) : (
@@ -42,19 +82,20 @@ function PublishingResultCard({ result }: { result: PublishingResult }) {
 
 export function Workbench({ state }: WorkbenchProps) {
   const selectedStoryIds = state.draft.selectedStories.map((story) => story.id);
-  const publishingResultsByStoryId = new Map(
-    state.publishingResults.map((result) => [result.sourceStoryId, result]),
-  );
-  const readyResults = state.publishingResults.filter(
-    (result) => result.status === "published",
-  ).length;
   const selectedCount = state.draft.selectedStories.length;
-  const hasPreparationResults = state.publishingResults.length > 0;
   const canPrepare = selectedCount > 0;
-  const preparedStoryLabel = readyResults === 1 ? "story" : "stories";
-  const preparationSummary = readyResults === selectedCount
-    ? `${readyResults} ${preparedStoryLabel} prepared in the Mock WordPress test environment.`
-    : `${readyResults} of ${selectedCount} stories prepared in the Mock WordPress test environment.`;
+  const canPublishReal = state.realWordPressConfigured && selectedCount === 1;
+  const mockPublishedCount = state.publishingResults.filter(
+    (result) => result.mode === "mock" && result.status === "published",
+  ).length;
+  const realPublishedCount = state.publishingResults.filter(
+    (result) => result.mode === "real" && result.status === "published",
+  ).length;
+  const hasPreparationResults = state.publishingResults.length > 0;
+  const preparedStoryLabel = mockPublishedCount === 1 ? "story" : "stories";
+  const mockSummary = mockPublishedCount === selectedCount
+    ? `${mockPublishedCount} ${preparedStoryLabel} prepared in the Mock WordPress test environment.`
+    : `${mockPublishedCount} of ${selectedCount} stories prepared in the Mock WordPress test environment.`;
 
   return (
     <main className="app-shell">
@@ -135,20 +176,21 @@ export function Workbench({ state }: WorkbenchProps) {
           <section className="workflow-panel preparation-panel" aria-labelledby="preparation-heading">
             <div className="panel-heading">
               <div>
-                <h2 id="preparation-heading">Mock WordPress test evidence</h2>
-                <p>Prepare local test results for the stories added above.</p>
+                <h2 id="preparation-heading">WordPress test evidence</h2>
+                <p>Prepare local mock results, or optionally publish one story to a disposable WordPress.com test site.</p>
               </div>
             </div>
 
             <div className="publishing-mode">
               <div>
-                <span className="mode-label">Test environment</span>
+                <span className="mode-label">Default test environment</span>
                 <strong>Mock WordPress</strong>
               </div>
               <span className="mock-badge">MOCK</span>
             </div>
 
             <form action={publishSelectedStories}>
+              <input type="hidden" name="mode" value="mock" />
               <button className="button button-primary prepare-button" type="submit" disabled={!canPrepare}>
                 Prepare selected stories
               </button>
@@ -159,10 +201,44 @@ export function Workbench({ state }: WorkbenchProps) {
                 : "Add at least one story to continue."}
             </p>
 
+            <div className={`publishing-mode real-mode${state.realWordPressConfigured ? "" : " is-disabled"}`}>
+              <div>
+                <span className="mode-label">Optional live integration</span>
+                <strong>REAL WORDPRESS.COM TEST SITE</strong>
+              </div>
+              <span className="real-badge">{state.realWordPressConfigured ? "REAL" : "DISABLED"}</span>
+            </div>
+
+            <form action={publishSelectedStories}>
+              <input type="hidden" name="mode" value="real" />
+              <button
+                className="button button-real prepare-button"
+                type="submit"
+                disabled={!canPublishReal}
+              >
+                Publish one story to the real test site
+              </button>
+            </form>
+            <p className="preparation-hint">
+              {!state.realWordPressConfigured
+                ? "Unavailable until server-side WordPress.com credentials are configured. No site or token fields are accepted in the browser."
+                : selectedCount === 1
+                  ? "Publishes exactly one selected fictional fixture story to the configured disposable WordPress.com test site."
+                  : "Select exactly one story before using the real WordPress.com test site."}
+            </p>
+
             {hasPreparationResults ? (
               <p className="preparation-summary" role="status">
-                <strong>{preparationSummary}</strong>
-                <span>Nothing was published externally.</span>
+                <strong>{mockSummary}</strong>
+                {realPublishedCount > 0 ? (
+                  <span>
+                    {realPublishedCount === 1
+                      ? "1 real WordPress.com test post is recorded."
+                      : `${realPublishedCount} real WordPress.com test posts are recorded.`}
+                  </span>
+                ) : (
+                  <span>Nothing was published externally unless a REAL result is shown below.</span>
+                )}
               </p>
             ) : null}
 
@@ -170,16 +246,23 @@ export function Workbench({ state }: WorkbenchProps) {
               <div className="publishing-results" aria-live="polite">
                 <div className="results-heading">
                   <h3>Result</h3>
-                  <span>{readyResults} of {selectedCount} ready</span>
+                  <span>{mockPublishedCount} of {selectedCount} mock ready</span>
                 </div>
                 <ul className="result-list">
                   {state.draft.selectedStories.map((story) => {
-                    const result = publishingResultsByStoryId.get(story.id);
+                    const storyResults = state.publishingResults.filter(
+                      (result) => result.sourceStoryId === story.id,
+                    );
                     return (
                       <li key={story.id} className="result-card">
                         <h4>{story.title}</h4>
-                        {result ? (
-                          <PublishingResultCard result={result} />
+                        {storyResults.length > 0 ? (
+                          storyResults.map((result) => (
+                            <PublishingResultCard
+                              key={`${result.provider}-${result.mode}`}
+                              result={result}
+                            />
+                          ))
                         ) : (
                           <p className="waiting-status">
                             <span className="status-dot" aria-hidden="true" />

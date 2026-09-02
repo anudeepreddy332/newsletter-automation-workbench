@@ -8,13 +8,19 @@ import { eq } from "drizzle-orm";
 
 import { storyOptionLabel } from "@/app/story-presentation";
 import { BenzingaShapedFixtureSource } from "@/src/adapters/rss/benzinga-shaped-rss";
-import { MockWordPress } from "@/src/adapters/publishing/mock-wordpress";
+import { MOCK_WORDPRESS_PROVIDER, MockWordPress } from "@/src/adapters/publishing/mock-wordpress";
+import { REAL_WORDPRESS_PROVIDER } from "@/src/adapters/publishing/real-wordpress";
 import type { ContentSource } from "@/src/content/content-source";
 import { openContentDatabase } from "@/src/db/database";
 import { applyContentFoundationMigrations } from "@/src/db/migrate";
 import type { ContentDatabase } from "@/src/db/database";
 import { contentFeeds, drafts, publications, publishingResults } from "@/src/db/schema";
 import type { ContentFeed, Story } from "@/src/domain/story";
+import type {
+  ContentPublisher,
+  PublishingRequest,
+  PublishingResult,
+} from "@/src/publishing/content-publisher";
 import { ContentRepository } from "@/src/repositories/content-repository";
 import {
   WorkbenchRepository,
@@ -40,7 +46,8 @@ async function withWorkbench(
 async function withContentSource(
   contentSource: ContentSource,
   run: (service: WorkbenchService, db: ContentDatabase) => Promise<void>,
-  publisher = new MockWordPress(),
+  publisher: ContentPublisher = new MockWordPress(),
+  realPublisher: ContentPublisher | null = null,
 ): Promise<void> {
   const temporaryDirectory = mkdtempSync(path.join(tmpdir(), "newsletter-workbench-"));
   const databasePath = path.join(temporaryDirectory, "workbench.db");
@@ -51,6 +58,7 @@ async function withContentSource(
     new ContentRepository(db),
     new WorkbenchRepository(db),
     publisher,
+    realPublisher,
   );
 
   try {
@@ -253,7 +261,11 @@ test("the operator UI is vertical with no publication selector or ordering contr
   assert.match(storyPickerSource, /selectedStory\?\.body/);
   assert.doesNotMatch(storyPickerSource, /— in newsletter|In newsletter/);
   assert.doesNotMatch(storyPickerSource, /<a(?:\s|>)|href=/);
-  assert.doesNotMatch(workbenchSource, /Choose advertiser links|Generate newsletter|RealWordPress/);
+  assert.doesNotMatch(workbenchSource, /Choose advertiser links|Generate newsletter|Iterable|Everflow/);
+  assert.match(workbenchSource, /REAL WORDPRESS\.COM TEST SITE/);
+  assert.match(workbenchSource, /result\.sourceStoryId === story\.id/);
+  assert.doesNotMatch(workbenchSource, /WORDPRESS_ACCESS_TOKEN|name="accessToken"|name="siteId"|type="password"/);
+  assert.doesNotMatch(actionsSource, /WORDPRESS_ACCESS_TOKEN|accessToken|siteId/);
   assert.doesNotMatch(actionsSource, /selectPublication/);
 });
 
@@ -362,7 +374,7 @@ test("MockWordPress results persist across reload and repeated publishing create
   });
 });
 
-test("publishing persistence keeps mock and future real-mode identities distinct", async () => {
+test("publishing persistence keeps mock and real-mode identities distinct", async () => {
   await withWorkbench(async (service, db) => {
     await service.addStory(firstStoryId);
     await service.publishSelectedStories();
@@ -373,11 +385,11 @@ test("publishing persistence keeps mock and future real-mode identities distinct
         draftId: draft.id,
         publicationId: draft.publicationId!,
         storyId: firstStoryId,
-        provider: "FutureWordPress",
+        provider: REAL_WORDPRESS_PROVIDER,
         mode: "real",
         status: "published",
-        externalPostId: "future_post_fixture",
-        url: "https://future-wordpress-fixture.test/posts/future_post_fixture",
+        externalPostId: "wp_real_post_fixture",
+        url: "https://example.wordpress.com/2026/09/02/controlled-story/",
         diagnostic: null,
       })
       .run();
@@ -390,9 +402,188 @@ test("publishing persistence keeps mock and future real-mode identities distinct
     assert.deepEqual(
       identities,
       [
-        { provider: "FutureWordPress", mode: "real" },
-        { provider: "MockWordPress", mode: "mock" },
+        { provider: MOCK_WORDPRESS_PROVIDER, mode: "mock" },
+        { provider: REAL_WORDPRESS_PROVIDER, mode: "real" },
       ],
     );
   });
+});
+
+class RecordingPublisher implements ContentPublisher {
+  readonly calls: PublishingRequest[] = [];
+
+  constructor(private readonly resultFor: (request: PublishingRequest) => PublishingResult) {}
+
+  async publish(request: PublishingRequest): Promise<PublishingResult> {
+    this.calls.push(request);
+    return this.resultFor(request);
+  }
+}
+
+test("unconfigured real publishing fails honestly without calling MockWordPress", async () => {
+  const mockPublisher = new RecordingPublisher((publishingRequest) => ({
+    sourceStoryId: publishingRequest.story.id,
+    provider: MOCK_WORDPRESS_PROVIDER,
+    mode: "mock",
+    status: "published",
+    externalPostId: "mock_should_not_be_used",
+    url: "https://wordpress-fixture.test/posts/mock_should_not_be_used",
+  }));
+
+  await withContentSource(
+    new BenzingaShapedFixtureSource(fixturePath),
+    async (service) => {
+      await service.addStory(firstStoryId);
+      const results = await service.publishSelectedStories("real");
+      const state = await service.load();
+
+      assert.equal(mockPublisher.calls.length, 0);
+      assert.deepEqual(results, [
+        {
+          sourceStoryId: firstStoryId,
+          provider: REAL_WORDPRESS_PROVIDER,
+          mode: "real",
+          status: "failed",
+          diagnostic:
+            "Real WordPress.com test publishing is unavailable because server-side credentials are not configured.",
+        },
+      ]);
+      assert.equal(state.realWordPressConfigured, false);
+      assert.equal(state.publishingResults[0]?.mode, "real");
+      assert.equal(state.publishingResults[0]?.status, "failed");
+    },
+    mockPublisher,
+    null,
+  );
+});
+
+test("real publishing requires exactly one selected story", async () => {
+  const realPublisher = new RecordingPublisher((publishingRequest) => ({
+    sourceStoryId: publishingRequest.story.id,
+    provider: REAL_WORDPRESS_PROVIDER,
+    mode: "real",
+    status: "published",
+    externalPostId: "88421",
+    url: "https://example.wordpress.com/2026/09/02/controlled-story/",
+  }));
+
+  await withContentSource(
+    new BenzingaShapedFixtureSource(fixturePath),
+    async (service) => {
+      await selectTwoStories(service);
+      await assert.rejects(
+        service.publishSelectedStories("real"),
+        (error: unknown) =>
+          error instanceof WorkbenchServiceError && error.code === "REAL_SINGLE_STORY_REQUIRED",
+      );
+      assert.equal(realPublisher.calls.length, 0);
+    },
+    new MockWordPress(),
+    realPublisher,
+  );
+});
+
+test("workbench state can represent both mock and real results for one story", async () => {
+  const realPublisher = new RecordingPublisher((publishingRequest) => ({
+    sourceStoryId: publishingRequest.story.id,
+    provider: REAL_WORDPRESS_PROVIDER,
+    mode: "real",
+    status: "published",
+    externalPostId: "88421",
+    url: "https://example.wordpress.com/2026/09/02/controlled-story/",
+  }));
+
+  await withContentSource(
+    new BenzingaShapedFixtureSource(fixturePath),
+    async (service) => {
+      await service.addStory(firstStoryId);
+      const mockResults = await service.publishSelectedStories("mock");
+      const realResults = await service.publishSelectedStories("real");
+      const state = await service.load();
+
+      assert.equal(state.realWordPressConfigured, true);
+      assert.equal(mockResults[0]?.mode, "mock");
+      assert.equal(realResults[0]?.mode, "real");
+      assert.equal(state.publishingResults.length, 2);
+      assert.deepEqual(
+        state.publishingResults.map((result) => ({
+          provider: result.provider,
+          mode: result.mode,
+          status: result.status,
+        })),
+        [
+          { provider: MOCK_WORDPRESS_PROVIDER, mode: "mock", status: "published" },
+          { provider: REAL_WORDPRESS_PROVIDER, mode: "real", status: "published" },
+        ],
+      );
+    },
+    new MockWordPress(),
+    realPublisher,
+  );
+});
+
+test("an existing successful real result prevents another real POST", async () => {
+  const realPublisher = new RecordingPublisher((publishingRequest) => ({
+    sourceStoryId: publishingRequest.story.id,
+    provider: REAL_WORDPRESS_PROVIDER,
+    mode: "real",
+    status: "published",
+    externalPostId: "88421",
+    url: "https://example.wordpress.com/2026/09/02/controlled-story/",
+  }));
+
+  await withContentSource(
+    new BenzingaShapedFixtureSource(fixturePath),
+    async (service) => {
+      await service.addStory(firstStoryId);
+      const first = await service.publishSelectedStories("real");
+      const second = await service.publishSelectedStories("real");
+      const reloaded = await service.load();
+
+      assert.equal(realPublisher.calls.length, 1);
+      assert.deepEqual(second, first);
+      assert.equal(reloaded.publishingResults.filter((result) => result.mode === "real").length, 1);
+    },
+    new MockWordPress(),
+    realPublisher,
+  );
+});
+
+test("an ambiguous real create outcome does not trigger a blind retry", async () => {
+  const realPublisher = new RecordingPublisher((publishingRequest) => ({
+    sourceStoryId: publishingRequest.story.id,
+    provider: REAL_WORDPRESS_PROVIDER,
+    mode: "real",
+    status: "unknown",
+    diagnostic:
+      "A network error prevented confirming whether the WordPress.com post was created.",
+  }));
+
+  await withContentSource(
+    new BenzingaShapedFixtureSource(fixturePath),
+    async (service) => {
+      await service.addStory(firstStoryId);
+      const first = await service.publishSelectedStories("real");
+      const second = await service.publishSelectedStories("real");
+
+      assert.equal(realPublisher.calls.length, 1);
+      assert.equal(first[0]?.status, "unknown");
+      assert.deepEqual(second, first);
+    },
+    new MockWordPress(),
+    realPublisher,
+  );
+});
+
+test("runtime wiring never exposes WordPress credentials to the client module graph", () => {
+  const runtimeSource = readFileSync(path.join(process.cwd(), "src/workbench/runtime.ts"), "utf8");
+  const actionsSource = readFileSync(path.join(process.cwd(), "app/actions.ts"), "utf8");
+  const workbenchSource = readFileSync(path.join(process.cwd(), "app/workbench.tsx"), "utf8");
+
+  assert.doesNotMatch(runtimeSource, /NEXT_PUBLIC_WORDPRESS/);
+  assert.match(runtimeSource, /readRealWordPressConfig/);
+  assert.match(runtimeSource, /new MockWordPress\(\)/);
+  assert.doesNotMatch(actionsSource, /WORDPRESS_ACCESS_TOKEN|WORDPRESS_SITE_ID/);
+  assert.match(workbenchSource, /mode" value="mock"/);
+  assert.match(workbenchSource, /mode" value="real"/);
 });

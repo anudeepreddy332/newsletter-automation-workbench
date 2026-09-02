@@ -10,7 +10,7 @@ import {
 } from "@/src/db/schema";
 import type { Draft, Publication } from "@/src/domain/workbench";
 import type { Story } from "@/src/domain/story";
-import type { PublishingResult } from "@/src/publishing/content-publisher";
+import type { PublishingMode, PublishingResult } from "@/src/publishing/content-publisher";
 
 const ACTIVE_DRAFT_ID = "draft_active_poc";
 
@@ -39,7 +39,23 @@ function asStory(row: typeof stories.$inferSelect): Story {
   };
 }
 
+function comparePublishingResults(left: PublishingResult, right: PublishingResult): number {
+  if (left.mode !== right.mode) {
+    return left.mode === "mock" ? -1 : 1;
+  }
+  return left.provider.localeCompare(right.provider);
+}
+
+function asPublishingMode(value: string): PublishingMode {
+  if (value === "mock" || value === "real") {
+    return value;
+  }
+  throw new Error("A stored publishing result has an invalid mode.");
+}
+
 function asPublishingResult(row: typeof publishingResults.$inferSelect): PublishingResult {
+  const mode = asPublishingMode(row.mode);
+
   if (row.status === "published") {
     if (!row.externalPostId || !row.url) {
       throw new Error("A stored successful publishing result is incomplete.");
@@ -47,7 +63,7 @@ function asPublishingResult(row: typeof publishingResults.$inferSelect): Publish
     return {
       sourceStoryId: row.storyId,
       provider: row.provider,
-      mode: row.mode as "mock" | "real",
+      mode,
       status: "published",
       externalPostId: row.externalPostId,
       url: row.url,
@@ -58,8 +74,18 @@ function asPublishingResult(row: typeof publishingResults.$inferSelect): Publish
     return {
       sourceStoryId: row.storyId,
       provider: row.provider,
-      mode: row.mode as "mock" | "real",
+      mode,
       status: "failed",
+      diagnostic: row.diagnostic,
+    };
+  }
+
+  if (row.status === "unknown" && row.diagnostic) {
+    return {
+      sourceStoryId: row.storyId,
+      provider: row.provider,
+      mode,
+      status: "unknown",
       diagnostic: row.diagnostic,
     };
   }
@@ -204,6 +230,16 @@ export class WorkbenchRepository {
       throw new Error("Publishing requires a selected publication.");
     }
 
+    const existing = this.findPublishingResult(
+      draft,
+      result.sourceStoryId,
+      result.provider,
+      result.mode,
+    );
+    if (existing?.status === "published") {
+      return;
+    }
+
     const values = {
       draftId: draft.id,
       publicationId: draft.publicationId,
@@ -213,7 +249,7 @@ export class WorkbenchRepository {
       status: result.status,
       externalPostId: result.status === "published" ? result.externalPostId : null,
       url: result.status === "published" ? result.url : null,
-      diagnostic: result.status === "failed" ? result.diagnostic : null,
+      diagnostic: result.status === "published" ? null : result.diagnostic,
     };
 
     this.db
@@ -235,6 +271,33 @@ export class WorkbenchRepository {
         },
       })
       .run();
+  }
+
+  findPublishingResult(
+    draft: Draft,
+    storyId: string,
+    provider: string,
+    mode: PublishingMode,
+  ): PublishingResult | undefined {
+    if (!draft.publicationId) {
+      return undefined;
+    }
+
+    const row = this.db
+      .select()
+      .from(publishingResults)
+      .where(
+        and(
+          eq(publishingResults.draftId, draft.id),
+          eq(publishingResults.publicationId, draft.publicationId),
+          eq(publishingResults.storyId, storyId),
+          eq(publishingResults.provider, provider),
+          eq(publishingResults.mode, mode),
+        ),
+      )
+      .get();
+
+    return row ? asPublishingResult(row) : undefined;
   }
 
   listPublishingResults(draft: Draft): PublishingResult[] {
@@ -261,8 +324,8 @@ export class WorkbenchRepository {
       ]);
     }
 
-    return draft.selectedStories.flatMap(
-      (story) => resultsByStoryId.get(story.id) ?? [],
+    return draft.selectedStories.flatMap((story) =>
+      [...(resultsByStoryId.get(story.id) ?? [])].sort(comparePublishingResults),
     );
   }
 

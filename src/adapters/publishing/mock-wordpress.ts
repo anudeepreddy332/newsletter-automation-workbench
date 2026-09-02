@@ -6,7 +6,7 @@ import type {
   PublishingResult,
 } from "@/src/publishing/content-publisher";
 
-const PROVIDER = "MockWordPress";
+export const MOCK_WORDPRESS_PROVIDER = "MockWordPress";
 
 type MockWordPressOptions = {
   failForStoryIds?: readonly string[];
@@ -23,7 +23,7 @@ export class MockWordPress implements ContentPublisher {
     if (this.failForStoryIds.has(request.story.id)) {
       return {
         sourceStoryId: request.story.id,
-        provider: PROVIDER,
+        provider: MOCK_WORDPRESS_PROVIDER,
         mode: "mock",
         status: "failed",
         diagnostic: "Mock publishing was configured to fail for this controlled story.",
@@ -33,7 +33,7 @@ export class MockWordPress implements ContentPublisher {
     const externalPostId = `mock_wp_${this.operationHash(request)}`;
     return {
       sourceStoryId: request.story.id,
-      provider: PROVIDER,
+      provider: MOCK_WORDPRESS_PROVIDER,
       mode: "mock",
       status: "published",
       externalPostId,

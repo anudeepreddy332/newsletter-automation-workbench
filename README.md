@@ -45,13 +45,31 @@ Benzinga-shaped RSS fixtures
 
 The POC ends at staging. It performs **no real email send**.
 
+## Optional Real WordPress.com configuration
+
+Mock WordPress remains the default and works with no credentials. Real
+WordPress.com test publishing is optional, server-side only, and disabled until
+both of these environment variables are set:
+
+- `WORDPRESS_SITE_ID` — numeric WordPress.com site ID
+- `WORDPRESS_ACCESS_TOKEN` — OAuth2 bearer token
+
+Put real values only in a local gitignored `.env` or `.env.local` file. Do not
+commit tokens, paste them into the browser, or store them in SQLite. See
+`.env.example` for variable names only.
+
+The numeric site ID comes from the authenticated
+`GET /rest/v1.1/me/sites` response `ID` field. Creating a post uses
+`POST /rest/v1.1/sites/$site/posts/new` with
+`Authorization: Bearer <token>`.
+
 ## POC scope
 
 - One modular application and one operator.
 - Deterministic, fixture-backed RSS intake through a `ContentSource` adapter.
 - Manual story selection and ordering.
 - `MockWordPress` as the required/default deterministic publisher; optional
-  `RealWordPress` only after Milestone 3A passes.
+  `RealWordPress` for one disposable WordPress.com test site after Milestone 3A.
 - A mock Everflow-style offer catalog and tracking URL.
 - Deterministic newsletter HTML and plain-text rendering.
 - Exact preview, human approval, lightweight revision/approval protection, and
