@@ -2,118 +2,121 @@
 
 ## Purpose and boundary
 
-This document freezes the POC architecture, not a production design. The POC
-is a manually initiated, single-operator flow from a controlled RSS fixture to
-a reviewable newsletter payload and a normalized WordPress publishing result.
-The precise editorial/content-generation behavior is intentionally not defined
-until its rules and approval point are supplied.
+This document freezes a single-operator, modular POC architecture rather than
+a production design. It makes a controlled newsletter workflow demonstrable
+offline with deterministic fixtures and mocks. Human decisions remain explicit
+at story selection, offer selection, and approval; no stage sends email.
 
 ## Concise architecture
 
-The workbench orchestrates a source adapter, a reviewable content workflow,
-and a publishing port. The source side is fixture-backed for the POC. The
-publishing port is implemented first by the required, deterministic
-`MockWordPress` adapter. `RealWordPress` is an optional adapter that can be
-added only after Mock validation passes.
+```text
+RSS fixture -> ContentSource -> normalized Story records -> SQLite
+                                                |
+                                                v
+                                     Single Operator Workbench
+                                      select/order stories
+                                                |
+                                                v
+                                ContentPublisher contract
+                           MockWordPress | RealWordPress (optional)
+                                                |
+                                                v
+                         choose Mock Everflow-style offer -> tracking URL
+                                                |
+                                                v
+                      deterministic newsletter renderer -> HTML/text preview
+                                                |
+                                                v
+                           human approval -> Mock Iterable staging -> receipt
+```
 
-```
-Controlled RSS fixture
-        |
-        v
-RSS source adapter -> normalized candidate -> reviewable newsletter payload
-                                                    |
-                                                    v
-                                         WordPress publishing port
-                                            |                 |
-                                            v                 v
-                                   MockWordPress       RealWordPress (optional)
-                                   deterministic       one disposable test site
-                                            \                 /
-                                             v               v
-                                  normalized post ID, status, URL + adapter name
-```
+The POC ends after Mock Iterable staging. There is no real Iterable call or
+email send.
 
 ## Components and responsibilities
 
 | Component | Responsibility | Must not do |
 | --- | --- | --- |
-| Workbench/orchestrator | Starts the manual POC run, carries state between boundaries, and presents the selected adapter and outcome. | Schedule unattended work or mask a failed result. |
-| RSS source adapter | Reads a controlled fixture and maps its entries to a normalized candidate contract. | Claim a live stakeholder feed has been supported. |
-| Content workflow/review boundary | Produces and exposes a reviewable newsletter payload before publishing. | Autonomously approve or publish content without an explicit POC rule. |
-| WordPress publishing port | Defines the request and normalized result shared by all WordPress adapters. | Embed an adapter-specific fallback policy. |
-| `MockWordPress` | Required/default deterministic adapter; returns a reproducible normalized fixture result. | Call WordPress or depend on credentials. |
-| `RealWordPress` | Optional adapter; uses server-side credentials to create one controlled fixture-backed post on one disposable WordPress.com test site. | Access the target organization's WordPress, support multiple sites, or silently substitute a mock result. |
-| Configuration/secret boundary | Selects the adapter and keeps any real credentials server-side. | Expose credentials to a browser/client or persist them in fixtures. |
+| Single Operator Workbench | Starts the manual flow; shows story browsing, selection/order, offer choice, preview, approval, and outcome. | Make automatic editorial or approval decisions. |
+| `ContentSource` adapter | Reads controlled RSS fixtures and normalizes provider-shaped items into domain `Story` records. | Expose raw RSS/XML to the application domain or claim live-feed compatibility. |
+| Content persistence | Stores normalized content, future draft state, and the minimum state needed for deterministic POC behavior. | Create production data models outside the active milestone. |
+| `ContentPublisher` contract | Defines a shared publishing/resolution request and normalized result. | Hide adapter failures or choose a fallback adapter. |
+| `MockWordPress` | Required/default deterministic publisher with visible status, post ID, and URL. | Use a network connection or credentials. |
+| `RealWordPress` | Optional Milestone 3B adapter for one disposable WordPress.com test site using server-side credentials. | Access the target organization, support multiple sites, or silently fall back to Mock mode. |
+| Mock Everflow-style offer adapter | Provides a deterministic offer catalog and tracking URL for operator choice. | Call Everflow or select an offer automatically. |
+| Newsletter renderer | Produces deterministic HTML and plain text from explicitly selected inputs. | Invent editorial content or perform a send. |
+| Preview and approval boundary | Shows the exact render, records human approval, invalidates approval on edits, and prevents duplicate staging. | Treat a draft as approved without an explicit human action. |
+| `MockIterable` | Stages an approved immutable snapshot and returns an idempotent receipt. | Call Iterable, manage an audience, or send email. |
+| Configuration/secret boundary | Selects adapters and keeps optional real WordPress credentials server-side. | Expose credentials to a browser/client or store them in fixtures. |
 
 ## Adapter boundaries
 
-### RSS source adapter
+### ContentSource
 
 The initial source contract is **Benzinga-shaped RSS** and is deliberately
-provisional. It is only a fixture schema used to make the POC testable until a
-representative stakeholder feed is available. A real feed may require a revised
-mapping, but no compatibility claim is valid before that comparison occurs.
+provisional. It exists only as fictional, controlled fixture data until a
+representative stakeholder feed is available. The domain consumes normalized
+`Story` records; it does not depend on raw provider XML structures.
 
-### WordPress publishing port
+`ContentFeed` identifies that source. `Publication` is deliberately reserved
+for the future newsletter brand/publication configuration selected by the
+operator in Milestone 2; it is not a synonym for a content feed.
 
-Every publisher adapter must accept the same approved publishing request and
-return a normalized result with, at minimum:
+### WordPress
 
-- adapter name/mode;
-- post ID;
-- status; and
-- URL.
+`MockWordPress` is required and must be deterministic and independently usable.
+`RealWordPress` is optional and may be added only after Milestone 3A passes. A
+real call may target one disposable WordPress.com test site, use server-side
+credentials only, create one controlled fixture-backed post within the approved
+scope, and return the observed normalized post ID, status, and URL.
 
-Errors are first-class results. When `RealWordPress` is selected, a failed call
-must remain visible as a real failure. The calling flow must not retry through
-`MockWordPress` or report a mock response as if it came from WordPress.
+Real failures are first-class results. A failed real call must be visible and
+must not retry through, or be represented as, MockWordPress.
 
-### MockWordPress
+### Offers and rendering
 
-`MockWordPress` is the required/default adapter and must be independently
-usable. For the same fixture-backed request, it must provide a deterministic
-result. It is not evidence of a live WordPress integration.
+The POC uses a Mock Everflow-style adapter only. The operator chooses an offer;
+the adapter supplies its tracking URL. The renderer then creates exact HTML and
+plain text from the selected stories, resolved publishing data, and selected
+offer. It is deterministic and does not make editorial decisions.
 
-### RealWordPress
+### Preview, approval, and staging
 
-`RealWordPress` is optional POC scope. It may be implemented only after
-Milestone 3A validates `MockWordPress`. It may target one disposable
-WordPress.com test site, use server-side credentials only, create one
-controlled fixture-backed post, and return the observed normalized ID, status,
-and URL. No target-organization site access and no multi-site mode are permitted.
+The exact rendered HTML and plain text must be previewed before a human
+approves a snapshot. Any edit invalidates approval. `MockIterable` stages only
+an approved snapshot, guards against duplicate staging, and returns a visible
+receipt. It never sends email.
 
-## Data flow
+## Data flow and known boundary
 
-1. An operator initiates a POC run.
-2. The RSS adapter reads the controlled fixture and normalizes an entry.
-3. The content workflow creates a reviewable payload under explicit future
-   editorial rules.
-4. The configured WordPress adapter receives the approved POC request.
-5. The adapter returns either a normalized success result or an explicit
-   failure result.
-6. The workbench displays the adapter identity and exact outcome.
+1. `ContentSource` reads a controlled fixture and returns normalized stories.
+2. The single operator chooses a newsletter brand/publication, stories, order,
+   and Mock Everflow-style offer.
+3. The selected stories pass through the WordPress publishing/resolution
+   boundary.
+4. The renderer builds exact HTML and plain text from the selected inputs.
+5. The workbench previews the output, records human approval, and stages the
+   approved snapshot to Mock Iterable.
+6. Mock Iterable returns a receipt; the POC stops.
 
-The mock path can complete entirely without network access or credentials. The
-real path is distinct and optional; no automatic path-switching is allowed.
-
-## WordPress assumptions
-
-- The only allowable live target is one disposable WordPress.com test site.
-- The test site and server-side credential mechanism have not been provided in
-  this baseline.
-- Any real use is limited to one controlled fixture-backed post within the
-  explicitly approved POC scope; whether that means one total or one per
-  approved demonstration remains unresolved.
-- Results must expose the actual normalized post ID, status, and URL when
-  available, or an honest failure when unavailable.
+The precise WordPress-to-newsletter input remains unresolved: URL, excerpt,
+full content, image, formatting, metadata, or any combination may be relevant.
+No implementation may infer that payload before it is supplied.
 
 ## Mocked versus genuine behavior
 
-| Behavior | Mock mode | Real mode |
+| Behavior | POC mock behavior | Optional genuine behavior |
 | --- | --- | --- |
-| RSS input | Controlled fixture | Controlled fixture for this POC |
-| WordPress interaction | Deterministic simulated result | Actual call to the single disposable test site |
-| Credentials | None | Server-side only |
-| Post creation | No real post | At most one controlled fixture-backed post |
-| Failure handling | Deterministic reported result | Report the actual failure; no silent fallback |
-| Evidence provided | Testable adapter contract | Limited live integration evidence only |
+| RSS | Controlled Benzinga-shaped fixture | No live compatibility claim |
+| WordPress | Deterministic MockWordPress result | One disposable WordPress.com test site only, after 3A |
+| Offers | Deterministic Mock Everflow-style catalog | No real Everflow integration |
+| Delivery | Mock Iterable stage-only receipt | No real Iterable integration or email send |
+| Credentials | None for mocks | Server-side only for optional RealWordPress |
+
+## WordPress assumptions
+
+- The only permissible live target is one disposable WordPress.com test site.
+- Target-organization access, target-organization credentials, multi-site
+  support, and 40-site fan-out are excluded.
+- The test site, credential mechanism, post type, cleanup policy, and meaning
+  of the one-post limit remain unresolved until Milestone 3B authorization.

@@ -2,54 +2,53 @@
 
 ## Verified stakeholder facts
 
-The following facts are treated as approved for the documentation baseline:
-
-- This is a Newsletter Automation Workbench POC, not a production automation
-  commitment.
-- Documentation and repository initialization are the first task; application
-  functionality is not authorized yet.
-- `MockWordPress` is the required/default deterministic WordPress adapter.
-- `RealWordPress` is optional POC scope and can target only one disposable
-  WordPress.com test site.
-- Real WordPress credentials must remain server-side.
-- A real adapter may create one controlled fixture-backed post and must return
-  normalized post ID, status, and URL.
-- A failed real call must be shown honestly; there is no silent fallback.
-- Mock mode must remain independently usable.
-- Target-organization WordPress access and multi-site support are excluded.
-- Milestone 3A implements and validates Mock first; 3B may add Real only after
-  3A passes.
+- The current business workflow is staff-led: RSS review, WordPress
+  publishing/resolution, manual newsletter preparation, offer-link selection,
+  manual Iterable assembly, human review, and eventual Iterable delivery.
+- The POC is a single modular application for one operator, not a production
+  automation commitment.
+- `MockWordPress` is required/default; optional `RealWordPress` comes only
+  after Mock validation and can use one disposable WordPress.com test site.
+- A real WordPress call uses server-side credentials only, returns normalized
+  post ID/status/URL, and fails honestly without Mock fallback.
+- The POC includes Mock Everflow-style offer selection, deterministic
+  newsletter rendering, exact preview, human approval, and stage-only Mock
+  Iterable receipts.
+- Real Everflow, real Iterable, real email send, target-organization access,
+  multi-site WordPress, and production infrastructure are excluded.
 
 ## POC assumptions
 
-- An operator will manually initiate and observe each POC run.
-- A controlled RSS fixture can stand in for a live source during the POC.
-- The workbench will have a reviewable payload before the publishing boundary
-  is invoked; the precise review UI and editorial rules are not frozen here.
-- A common WordPress publishing port can return adapter name, post ID, status,
-  and URL for both adapters.
+- One operator manually initiates and observes every POC run.
+- Controlled RSS fixtures stand in for live source data.
 - The initial **Benzinga-shaped RSS schema is provisional until a
-  representative stakeholder feed is available**. It is suitable only as a
-  testable initial fixture contract, not proof of live-feed compatibility.
-- Any real demonstration will have an identified disposable WordPress.com site
-  and provisioned server-side credentials before RealWordPress is attempted.
+  representative stakeholder feed is available**. It is fictional test data,
+  not a copy of proprietary feed content or a compatibility claim.
+- The operator, rather than automation, selects and orders stories and chooses
+  the mock offer.
+- `ContentFeed` identifies a source feed. `Publication` is reserved for the
+  future newsletter brand/publication selection, not source-feed identity.
+- Draft rendering can be deterministic once the selected inputs and future
+  payload contract are explicit.
+- Mock Iterable can stage an immutable approved snapshot without any real send.
 
 ## Unresolved questions
 
 | Question | Why it matters | Required before |
 | --- | --- | --- |
-| What representative stakeholder RSS feed/sample is available, and may it be stored as a test fixture? | Confirms or changes the provisional source mapping. | Any live-source compatibility claim. |
-| Which fields in the provisional Benzinga-shaped schema are required, optional, or unsupported? | Defines the normalization and validation contract. | Milestone 1 exit. |
-| What makes an item eligible for the newsletter? | Prevents inventing selection logic. | Content workflow implementation. |
-| What exact newsletter payload and editorial review/approval rules are required? | Defines the review boundary and publishing request. | Milestone 2 exit. |
-| Who may initiate a run and approve publishing in the POC? | Defines the manual control and authorization model. | Any publish-capable demo. |
-| What disposable WordPress.com test site, credential method, post type, and cleanup policy are approved? | Bounds the optional live integration safely. | Milestone 3B start. |
-| Does “one controlled fixture-backed post” mean one per demo run or one total across the POC? | Prevents exceeding the permitted live-write scope. | First RealWordPress call. |
-| What status vocabulary and URL behavior should the normalized result use on a real error? | Keeps outcome reporting consistent and honest. | WordPress port finalization. |
-| Is a live stakeholder RSS read in scope after a representative feed is supplied? | Separates a schema check from expanding the POC's network scope. | Any live-source work. |
+| What representative stakeholder RSS feed/sample is available and may it be retained as a fixture? | Confirms or changes the provisional source mapping. | Any live-source compatibility claim. |
+| What exact WordPress-to-newsletter payload is available: URL, excerpt, full content, image, formatting, metadata, or a combination? | Defines renderer inputs without invention. | Milestone 4 implementation. |
+| What newsletter brand/publication configurations can the operator select? | Defines the Milestone 2 publication boundary. | Milestone 2 implementation. |
+| What story eligibility, editorial, and ordering rules apply? | Keeps decisions human-led and prevents invented automation. | Milestone 2 completion. |
+| What mock offer fields and tracking URL form should the POC display? | Defines the deterministic Mock Everflow-style catalog. | Milestone 4 implementation. |
+| What subject, preheader, HTML, and plain-text content contract is required? | Defines deterministic rendering and exact preview. | Milestone 4 completion. |
+| Who can approve a preview and what change counts as an approval-invalidating edit? | Defines review protection. | Milestone 5 implementation. |
+| What receipt fields prove mock staging and duplicate protection? | Defines Mock Iterable stage-only evidence. | Milestone 5 completion. |
+| Which disposable WordPress.com test site, credential method, post type, cleanup policy, and one-post interpretation are approved? | Bounds optional real publishing. | Milestone 3B start. |
 
 ## Baseline decision
 
-Until the unresolved questions are answered in writing, implementation must use
-controlled fixtures, retain `MockWordPress` as the default, and avoid claiming
-stakeholder-feed compatibility or live WordPress success.
+Until the unresolved questions are answered in writing, implementation remains
+fixture-backed, deterministic, mock-first, human-controlled, and stage-only.
+It must not claim stakeholder-feed compatibility, live WordPress success, real
+offer tracking, real Iterable staging, or email delivery.

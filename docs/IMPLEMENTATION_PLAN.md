@@ -2,29 +2,29 @@
 
 ## Governing sequence
 
-This plan starts after the documentation baseline is reviewed. No milestone
-authorizes a later milestone merely because its code exists: the stated exit
-criteria and validation must pass first. `MockWordPress` is mandatory and
-precedes all real WordPress work.
+No milestone may begin until the previous milestone passes independent review.
+This sequence is the implementation contract; code must not add a later
+boundary early merely because it appears technically convenient.
 
-| Milestone | Objective | Exit criteria | Required validation before proceeding |
-| --- | --- | --- | --- |
-| 0 — Documentation baseline | Freeze the POC contract, scope, adapter policy, and unanswered questions. | `README.md`, architecture, assumptions, and plan agree on deterministic Mock-first behavior, optional RealWordPress, provisional Benzinga-shaped schema, no target-organization access, and no silent fallback. | Document review identifies no unresolved contradiction; any open product decision remains explicitly recorded rather than implemented by assumption. |
-| 1 — Source fixture and normalization contract | Define the controlled RSS fixture and normalized candidate contract. | Fixture provenance/use is recorded; required/optional fields, validation behavior, and failure cases are explicit. The contract still labels the Benzinga-shaped schema provisional. | Deterministic fixture-validation tests pass; a reviewer confirms no live stakeholder-feed compatibility claim is implied. |
-| 2 — Reviewable content workflow | Implement the manually initiated flow that exposes a newsletter payload before publishing. | The payload, selection/editing rules, approval point, and invalid-input behavior are explicit and observable. No unattended publishing exists. | End-to-end fixture-to-review-boundary test passes; approved editorial/approval rules are present and no decision logic was invented beyond them. |
-| 3A — MockWordPress | Implement the required/default deterministic WordPress adapter and shared publishing result contract. | Mock mode works without network or credentials and returns reproducible adapter name, post ID, status, and URL for the same fixture-backed request. | Unit and integration tests prove determinism, independent Mock usability, and displayed adapter identity/outcome. **This milestone must pass before 3B begins.** |
-| 3B — RealWordPress (optional) | Add the bounded live adapter only if an approved disposable test site and server-side credentials are supplied. | A real call can create at most one controlled fixture-backed post on the approved one-site target and returns observed normalized ID, status, and URL. | Security review confirms no client-side credential exposure; a controlled success and a controlled failure path prove no Mock fallback. Stop if the permitted site/credentials/write scope are not explicitly available. |
-| 4 — Honest outcome integration | Make adapter selection, success, and failure visible through the full POC flow. | Mock and optional Real results are distinguishable; a Real failure is reported as a failure with no hidden switch to Mock. | End-to-end tests cover Mock success, Real success when configured, Real failure, and unavailable Real configuration. Assertions verify the shown mode and result match the adapter outcome. |
-| 5 — Bounded demo rehearsal | Rehearse the single-operator demo using controlled fixtures and the approved adapter mode. | The demo meets every applicable README success criterion and produces a concise outcome record. | Repeatability check for the Mock demo passes. If Real is rehearsed, inspect the actual test-site result and confirm the one-post constraint; do not substitute Mock evidence. |
-| 6 — Review handoff | Prepare the POC evidence and known limits for a go/no-go review. | Evidence links results to the fixture, configuration mode, tests, and any live post URL/status; unresolved questions and exclusions remain visible. | Independent review confirms the demo claims do not exceed the evidence. No production release, target-organization access, multi-site expansion, or additional automation proceeds without new authorization. |
+| Milestone | Scope | Exit criteria and required validation |
+| --- | --- | --- |
+| 0 — Architecture/documentation baseline | Freeze the problem, scope, boundaries, assumptions, demo criteria, and privacy-safe terminology. | All four contract documents agree on the complete RSS-to-Mock-Iterable workflow, exclusions, unresolved WordPress-to-newsletter payload, and Milestones 0–6. |
+| 1 — Deterministic content foundation | RSS fixture -> parsing -> normalized content model -> SQLite persistence -> tests. | Deterministic parser/normalizer and migration-backed persistence pass focused tests for repeatability, optional values, malformed XML, URL validation, and round trips. |
+| 2 — Single workbench selection flow | Publication/newsletter-brand selection; story browsing; manual story selection and ordering; draft persistence. | Operator choices and draft state are explicit, persisted, and testable. No publishing, offers, rendering, approval, or staging is added. |
+| 3A — MockWordPress | `ContentPublisher` contract; deterministic MockWordPress; visible status/post ID/URL; controlled failure; no network. | Contract and integration tests prove independent deterministic mock success/failure behavior. This must pass before 3B. |
+| 3B — RealWordPress (optional) | One disposable WordPress.com test site; server-side authentication; controlled post creation; observed post ID/status/URL; no silent fallback. | Security and controlled success/failure validation confirm one-site, server-side, honest real behavior. Stop without explicit target, credential, cleanup, and write-scope authorization. |
+| 4 — Offer selection + deterministic newsletter rendering | Mock Everflow catalog; operator offer selection; tracking URL; subject/preheader; deterministic HTML and plain text. | Same selected inputs yield exact HTML/plain-text output; no real Everflow or editorial automation exists. |
+| 5 — Preview + approval + Mock Iterable | Exact preview; human approval; edits invalidate approval; stage-only Mock Iterable; idempotent staging; receipt; no send. | Tests prove approval protection, duplicate-staging protection, receipt visibility, and absence of real delivery. |
+| 6 — Demo hardening | Complete end-to-end happy path; controlled failures; offline deterministic demo; final demo script; limitations/evidence review. | Independent review confirms complete evidence, known limitations, and claims bounded to what the demo proves. |
 
 ## Stop conditions
 
-- Do not start application work until Milestone 0 is reviewed.
-- Do not start 3B until 3A has passed.
-- Do not make a RealWordPress call without the explicitly approved disposable
-  site, server-side credentials, and interpretation of the one-post limit.
-- Do not claim live-feed compatibility without a representative stakeholder feed
-  comparison.
-- Do not convert a real failure into a mock success or continue by silent
-  fallback.
+- Do not begin Milestone 2 before independent Milestone 1 review approval.
+- Do not begin 3B until 3A passes independently.
+- Do not make a real WordPress call without explicitly approved disposable-site
+  scope and server-side credentials.
+- Do not implement real Everflow, real Iterable, email delivery, automatic
+  editorial decisions, production authentication, analytics, queues,
+  microservices, workflow engines, or production deployment.
+- Do not infer the WordPress-to-newsletter payload or claim live-feed
+  compatibility without supporting stakeholder evidence.
