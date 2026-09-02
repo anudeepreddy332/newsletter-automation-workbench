@@ -9,7 +9,7 @@ import { MockWordPress } from "@/src/adapters/publishing/mock-wordpress";
 import { openContentDatabase } from "@/src/db/database";
 import { applyContentFoundationMigrations } from "@/src/db/migrate";
 import type { NewsletterAssemblyInput } from "@/src/domain/newsletter";
-import { buildNewsletterAssemblyInput } from "@/src/newsletter/assembly";
+import { buildNewsletterAssemblyInput, resolveNewsletterStoryUrl } from "@/src/newsletter/assembly";
 import { fingerprintNewsletterInput } from "@/src/newsletter/fingerprint";
 import { POC_SPONSORED_LINKS_HEADING, placeNewsletterContent } from "@/src/newsletter/placement";
 import { escapeHtml, renderNewsletter } from "@/src/newsletter/renderer";
@@ -191,6 +191,116 @@ test("assembly input stays provider-neutral", () => {
   });
   assert.equal("id" in input.offers[0]!, false);
   assert.equal("provider" in input.stories[0]!, false);
+});
+
+const controlledStory = {
+  id: "story_controlled",
+  contentFeedId: "content_feed_controlled",
+  title: "Controlled story",
+  summary: "Controlled summary.",
+  canonicalUrl: "https://fixture.example.test/news/controlled-story",
+  publishedAt: "2026-09-02T06:00:00.000Z",
+} as const;
+
+const mockPublished = {
+  sourceStoryId: controlledStory.id,
+  provider: "MockWordPress",
+  mode: "mock" as const,
+  status: "published" as const,
+  externalPostId: "mock_wp_controlled",
+  url: "https://wordpress-fixture.test/posts/mock_wp_controlled",
+};
+
+const realPublished = {
+  sourceStoryId: controlledStory.id,
+  provider: "WordPress.com",
+  mode: "real" as const,
+  status: "published" as const,
+  externalPostId: "88421",
+  url: "https://example.wordpress.com/2026/09/02/controlled-story/",
+};
+
+test("real published and mock published resolve to the real WordPress.com URL", () => {
+  const restoreFetch = installNetworkGuard();
+  try {
+    const mockFirst = resolveNewsletterStoryUrl(controlledStory, [mockPublished, realPublished]);
+    const realFirst = resolveNewsletterStoryUrl(controlledStory, [realPublished, mockPublished]);
+    const assembled = buildNewsletterAssemblyInput([controlledStory], [], [mockPublished, realPublished]);
+
+    assert.equal(mockFirst, realPublished.url);
+    assert.equal(realFirst, realPublished.url);
+    assert.equal(assembled.stories[0]?.url, realPublished.url);
+  } finally {
+    restoreFetch();
+  }
+});
+
+test("mock published only resolves to the MockWordPress URL", () => {
+  assert.equal(resolveNewsletterStoryUrl(controlledStory, [mockPublished]), mockPublished.url);
+});
+
+test("no published result resolves to the story canonical URL", () => {
+  assert.equal(resolveNewsletterStoryUrl(controlledStory, []), controlledStory.canonicalUrl);
+  assert.equal(
+    resolveNewsletterStoryUrl(controlledStory, [
+      {
+        sourceStoryId: controlledStory.id,
+        provider: "MockWordPress",
+        mode: "mock",
+        status: "failed",
+        diagnostic: "Mock publishing was configured to fail for this controlled story.",
+      },
+    ]),
+    controlledStory.canonicalUrl,
+  );
+});
+
+test("failed or unknown real results do not override a valid mock published URL", () => {
+  const failedReal = {
+    sourceStoryId: controlledStory.id,
+    provider: "WordPress.com",
+    mode: "real" as const,
+    status: "failed" as const,
+    diagnostic: "WordPress.com authentication failed.",
+  };
+  const unknownReal = {
+    sourceStoryId: controlledStory.id,
+    provider: "WordPress.com",
+    mode: "real" as const,
+    status: "unknown" as const,
+    diagnostic: "The WordPress.com request did not complete.",
+  };
+
+  assert.equal(
+    resolveNewsletterStoryUrl(controlledStory, [failedReal, mockPublished]),
+    mockPublished.url,
+  );
+  assert.equal(
+    resolveNewsletterStoryUrl(controlledStory, [unknownReal, mockPublished]),
+    mockPublished.url,
+  );
+});
+
+test("equivalent resolved inputs still render identically", () => {
+  const restoreFetch = installNetworkGuard();
+  try {
+    const fromMockFirst = buildNewsletterAssemblyInput(
+      [controlledStory],
+      [],
+      [mockPublished, realPublished],
+    );
+    const fromRealFirst = buildNewsletterAssemblyInput(
+      [controlledStory],
+      [],
+      [realPublished, mockPublished],
+    );
+
+    assert.deepEqual(fromRealFirst, fromMockFirst);
+    assert.deepEqual(renderNewsletter(fromRealFirst), renderNewsletter(fromMockFirst));
+    assert.deepEqual(renderNewsletter(controlledInput), renderNewsletter(controlledInput));
+  } finally {
+    restoreFetch();
+  }
 });
 
 test("newsletter generation allows zero selected offers", async () => {
