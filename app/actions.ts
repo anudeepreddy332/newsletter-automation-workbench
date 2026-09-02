@@ -36,3 +36,8 @@ export async function moveStoryDown(formData: FormData): Promise<void> {
   await workbenchService.moveStoryDown(requiredValue(formData, "storyId"));
   revalidatePath("/");
 }
+
+export async function publishSelectedStories(): Promise<void> {
+  await workbenchService.publishSelectedStories();
+  revalidatePath("/");
+}

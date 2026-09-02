@@ -47,3 +47,29 @@ export const draftStories = sqliteTable(
   },
   (table) => [primaryKey({ columns: [table.draftId, table.storyId] })],
 );
+
+export const publishingResults = sqliteTable(
+  "publishing_results",
+  {
+    draftId: text("draft_id")
+      .notNull()
+      .references(() => drafts.id, { onDelete: "cascade" }),
+    publicationId: text("publication_id")
+      .notNull()
+      .references(() => publications.id),
+    storyId: text("story_id")
+      .notNull()
+      .references(() => stories.id),
+    provider: text("provider").notNull(),
+    mode: text("mode").notNull(),
+    status: text("status").notNull(),
+    externalPostId: text("external_post_id"),
+    url: text("url"),
+    diagnostic: text("diagnostic"),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.draftId, table.publicationId, table.storyId, table.provider, table.mode],
+    }),
+  ],
+);

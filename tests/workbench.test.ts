@@ -7,18 +7,19 @@ import test from "node:test";
 import { eq } from "drizzle-orm";
 
 import { BenzingaShapedFixtureSource } from "@/src/adapters/rss/benzinga-shaped-rss";
+import { MockWordPress } from "@/src/adapters/publishing/mock-wordpress";
 import type { ContentSource } from "@/src/content/content-source";
 import { openContentDatabase } from "@/src/db/database";
 import { applyContentFoundationMigrations } from "@/src/db/migrate";
 import type { ContentDatabase } from "@/src/db/database";
-import { contentFeeds } from "@/src/db/schema";
+import { contentFeeds, publishingResults } from "@/src/db/schema";
 import type { ContentFeed, Story } from "@/src/domain/story";
 import { ContentRepository } from "@/src/repositories/content-repository";
 import {
   WorkbenchRepository,
   WorkbenchRepositoryError,
 } from "@/src/repositories/workbench-repository";
-import { WorkbenchService } from "@/src/workbench/workbench-service";
+import { WorkbenchService, WorkbenchServiceError } from "@/src/workbench/workbench-service";
 
 const fixturePath = path.join(
   process.cwd(),
@@ -28,7 +29,7 @@ const firstStoryId = "story_6c43c8a1944281017858d68b";
 const secondStoryId = "story_5c6a67b4a9b7cb360ddc7877";
 
 async function withWorkbench(
-  run: (service: WorkbenchService) => Promise<void>,
+  run: (service: WorkbenchService, db: ContentDatabase) => Promise<void>,
 ): Promise<void> {
   await withContentSource(new BenzingaShapedFixtureSource(fixturePath), run);
 }
@@ -36,6 +37,7 @@ async function withWorkbench(
 async function withContentSource(
   contentSource: ContentSource,
   run: (service: WorkbenchService, db: ContentDatabase) => Promise<void>,
+  publisher = new MockWordPress(),
 ): Promise<void> {
   const temporaryDirectory = mkdtempSync(path.join(tmpdir(), "newsletter-workbench-"));
   const databasePath = path.join(temporaryDirectory, "workbench.db");
@@ -45,6 +47,7 @@ async function withContentSource(
     contentSource,
     new ContentRepository(db),
     new WorkbenchRepository(db),
+    publisher,
   );
 
   try {
@@ -206,5 +209,99 @@ test("workbench loads stories from the content feed returned by its source", asy
         sourceItemId: undefined,
       },
     ]);
+  });
+});
+
+test("publishing requires a selected publication", async () => {
+  await withWorkbench(async (service) => {
+    await service.addStory(firstStoryId);
+
+    await assert.rejects(
+      service.publishSelectedStories(),
+      (error: unknown) =>
+        error instanceof WorkbenchServiceError && error.code === "PUBLICATION_REQUIRED",
+    );
+  });
+});
+
+test("publishing requires at least one selected story", async () => {
+  await withWorkbench(async (service) => {
+    await service.selectPublication("publication_market_brief");
+
+    await assert.rejects(
+      service.publishSelectedStories(),
+      (error: unknown) =>
+        error instanceof WorkbenchServiceError && error.code === "STORIES_REQUIRED",
+    );
+  });
+});
+
+test("publishing processes only the stories currently selected on the active draft", async () => {
+  await withWorkbench(async (service) => {
+    await service.selectPublication("publication_market_brief");
+    await service.addStory(firstStoryId);
+
+    const results = await service.publishSelectedStories();
+
+    assert.deepEqual(results.map((result) => result.sourceStoryId), [firstStoryId]);
+  });
+});
+
+test("MockWordPress results persist across reload and repeated publishing creates no duplicates", async () => {
+  await withWorkbench(async (service, db) => {
+    await service.selectPublication("publication_daily_dispatch");
+    await selectTwoStories(service);
+
+    const firstRun = await service.publishSelectedStories();
+    const secondRun = await service.publishSelectedStories();
+    const reloaded = await service.load();
+    const persisted = db.select().from(publishingResults).all();
+
+    assert.deepEqual(secondRun, firstRun);
+    assert.deepEqual(reloaded.publishingResults, firstRun);
+    assert.equal(persisted.length, 2);
+    assert.deepEqual(
+      persisted.map((result) => ({ provider: result.provider, mode: result.mode })),
+      [
+        { provider: "MockWordPress", mode: "mock" },
+        { provider: "MockWordPress", mode: "mock" },
+      ],
+    );
+  });
+});
+
+test("publishing persistence keeps mock and future real-mode identities distinct", async () => {
+  await withWorkbench(async (service, db) => {
+    await service.selectPublication("publication_market_brief");
+    await service.addStory(firstStoryId);
+    await service.publishSelectedStories();
+    const draft = (await service.load()).draft;
+
+    db.insert(publishingResults)
+      .values({
+        draftId: draft.id,
+        publicationId: draft.publicationId!,
+        storyId: firstStoryId,
+        provider: "FutureWordPress",
+        mode: "real",
+        status: "published",
+        externalPostId: "future_post_fixture",
+        url: "https://future-wordpress-fixture.test/posts/future_post_fixture",
+        diagnostic: null,
+      })
+      .run();
+
+    const identities = db.select({ provider: publishingResults.provider, mode: publishingResults.mode })
+      .from(publishingResults)
+      .all()
+      .sort((left, right) => left.provider.localeCompare(right.provider));
+
+    assert.deepEqual(
+      identities,
+      [
+        { provider: "FutureWordPress", mode: "real" },
+        { provider: "MockWordPress", mode: "mock" },
+      ],
+    );
   });
 });

@@ -1,9 +1,16 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
 import type { ContentDatabase } from "@/src/db/database";
-import { draftStories, drafts, publications, stories } from "@/src/db/schema";
+import {
+  draftStories,
+  drafts,
+  publications,
+  publishingResults,
+  stories,
+} from "@/src/db/schema";
 import type { Draft, Publication } from "@/src/domain/workbench";
 import type { Story } from "@/src/domain/story";
+import type { PublishingResult } from "@/src/publishing/content-publisher";
 
 const ACTIVE_DRAFT_ID = "draft_active_poc";
 
@@ -29,6 +36,34 @@ function asStory(row: typeof stories.$inferSelect): Story {
     sourceAuthor: row.sourceAuthor ?? undefined,
     sourceItemId: row.sourceItemId ?? undefined,
   };
+}
+
+function asPublishingResult(row: typeof publishingResults.$inferSelect): PublishingResult {
+  if (row.status === "published") {
+    if (!row.externalPostId || !row.url) {
+      throw new Error("A stored successful publishing result is incomplete.");
+    }
+    return {
+      sourceStoryId: row.storyId,
+      provider: row.provider,
+      mode: row.mode as "mock" | "real",
+      status: "published",
+      externalPostId: row.externalPostId,
+      url: row.url,
+    };
+  }
+
+  if (row.status === "failed" && row.diagnostic) {
+    return {
+      sourceStoryId: row.storyId,
+      provider: row.provider,
+      mode: row.mode as "mock" | "real",
+      status: "failed",
+      diagnostic: row.diagnostic,
+    };
+  }
+
+  throw new Error("A stored publishing result has an invalid status.");
 }
 
 export class WorkbenchRepository {
@@ -161,6 +196,73 @@ export class WorkbenchRepository {
     storyIds[currentIndex] = targetStoryId;
     storyIds[targetIndex] = storyId;
     this.replaceDraftStories(storyIds);
+  }
+
+  savePublishingResult(draft: Draft, result: PublishingResult): void {
+    if (!draft.publicationId) {
+      throw new Error("Publishing requires a selected publication.");
+    }
+
+    const values = {
+      draftId: draft.id,
+      publicationId: draft.publicationId,
+      storyId: result.sourceStoryId,
+      provider: result.provider,
+      mode: result.mode,
+      status: result.status,
+      externalPostId: result.status === "published" ? result.externalPostId : null,
+      url: result.status === "published" ? result.url : null,
+      diagnostic: result.status === "failed" ? result.diagnostic : null,
+    };
+
+    this.db
+      .insert(publishingResults)
+      .values(values)
+      .onConflictDoUpdate({
+        target: [
+          publishingResults.draftId,
+          publishingResults.publicationId,
+          publishingResults.storyId,
+          publishingResults.provider,
+          publishingResults.mode,
+        ],
+        set: {
+          status: values.status,
+          externalPostId: values.externalPostId,
+          url: values.url,
+          diagnostic: values.diagnostic,
+        },
+      })
+      .run();
+  }
+
+  listPublishingResults(draft: Draft): PublishingResult[] {
+    if (!draft.publicationId) {
+      return [];
+    }
+
+    const persistedResults = this.db
+      .select()
+      .from(publishingResults)
+      .where(
+        and(
+          eq(publishingResults.draftId, draft.id),
+          eq(publishingResults.publicationId, draft.publicationId),
+        ),
+      )
+      .all()
+      .map(asPublishingResult);
+    const resultsByStoryId = new Map<string, PublishingResult[]>();
+    for (const result of persistedResults) {
+      resultsByStoryId.set(result.sourceStoryId, [
+        ...(resultsByStoryId.get(result.sourceStoryId) ?? []),
+        result,
+      ]);
+    }
+
+    return draft.selectedStories.flatMap(
+      (story) => resultsByStoryId.get(story.id) ?? [],
+    );
   }
 
   private replaceDraftStories(storyIds: string[]): void {

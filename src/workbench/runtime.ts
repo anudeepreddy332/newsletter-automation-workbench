@@ -1,6 +1,7 @@
 import path from "node:path";
 
 import { BenzingaShapedFixtureSource } from "@/src/adapters/rss/benzinga-shaped-rss";
+import { MockWordPress } from "@/src/adapters/publishing/mock-wordpress";
 import { openContentDatabase } from "@/src/db/database";
 import { applyContentFoundationMigrations } from "@/src/db/migrate";
 import { ContentRepository } from "@/src/repositories/content-repository";
@@ -22,4 +23,5 @@ export const workbenchService = new WorkbenchService(
   new BenzingaShapedFixtureSource(fixturePath),
   new ContentRepository(db),
   new WorkbenchRepository(db),
+  new MockWordPress(),
 );

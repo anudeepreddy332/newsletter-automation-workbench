@@ -2,6 +2,7 @@ import {
   addStory,
   moveStoryDown,
   moveStoryUp,
+  publishSelectedStories,
   removeStory,
   selectPublication,
 } from "@/app/actions";
@@ -13,6 +14,9 @@ type WorkbenchProps = {
 
 export function Workbench({ state }: WorkbenchProps) {
   const selectedStoryIds = new Set(state.draft.selectedStories.map((story) => story.id));
+  const publishingResultsByStoryId = new Map(
+    state.publishingResults.map((result) => [result.sourceStoryId, result]),
+  );
 
   return (
     <main>
@@ -104,6 +108,48 @@ export function Workbench({ state }: WorkbenchProps) {
               </li>
             ))}
           </ol>
+        )}
+      </section>
+
+      <section aria-labelledby="wordpress-heading">
+        <h2 id="wordpress-heading">Mock WordPress</h2>
+        <p>Publish or resolve the current selected stories using the deterministic offline mock.</p>
+        <form action={publishSelectedStories}>
+          <button type="submit">Publish/resolve selected stories</button>
+        </form>
+        {state.draft.selectedStories.length === 0 ? (
+          <p>No selected stories have Mock WordPress results yet.</p>
+        ) : (
+          <ul>
+            {state.draft.selectedStories.map((story) => {
+              const result = publishingResultsByStoryId.get(story.id);
+              return (
+                <li key={story.id}>
+                  <article>
+                    <h3>{story.title}</h3>
+                    {result ? (
+                      <>
+                        <p>Adapter: {result.provider} ({result.mode.toUpperCase()})</p>
+                        <p>Status: {result.status === "published" ? "Published" : "Failed"}</p>
+                        {result.status === "published" ? (
+                          <>
+                            <p>Mock post: {result.externalPostId}</p>
+                            <p>
+                              Mock resolved URL: <a href={result.url}>{result.url}</a>
+                            </p>
+                          </>
+                        ) : (
+                          <p>Diagnostic: {result.diagnostic}</p>
+                        )}
+                      </>
+                    ) : (
+                      <p>Not yet published or resolved through MockWordPress.</p>
+                    )}
+                  </article>
+                </li>
+              );
+            })}
+          </ul>
         )}
       </section>
     </main>
