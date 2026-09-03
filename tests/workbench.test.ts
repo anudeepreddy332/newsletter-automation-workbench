@@ -292,9 +292,10 @@ test("the operator UI is vertical with fetch, choose, arrange, generate, review,
   assert.match(storyPickerSource, /View/);
   assert.doesNotMatch(storyPickerSource, /<select|Add to newsletter/);
   assert.doesNotMatch(storyPickerSource, /<a(?:\s|>)|href=/);
-  assert.match(layoutSource, /Move up/);
-  assert.match(layoutSource, /Move down/);
-  assert.match(layoutSource, /draggable/);
+  assert.doesNotMatch(layoutSource, /Move up|Move down|moveBlockUp|moveBlockDown/);
+  assert.match(layoutSource, /@dnd-kit\/sortable/);
+  assert.match(layoutSource, /MouseSensor|PointerSensor|TouchSensor/);
+  assert.match(layoutSource, /Remove/);
   assert.match(layoutSource, /Story|Sponsored/);
   assert.doesNotMatch(workbenchSource, /Everflow|afterStoryId|relevance score/);
   assert.doesNotMatch(generatedSource, /Iterable|Approve newsletter/);

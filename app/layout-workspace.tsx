@@ -1,8 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  MouseSensor,
+  PointerSensor,
+  TouchSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
-import { moveBlockDown, moveBlockUp, removeBlock, reorderLayout } from "@/app/actions";
+import { removeBlock, reorderLayout } from "@/app/actions";
 import { layoutBlockKey } from "@/src/domain/layout";
 import type { NewsletterBlock } from "@/src/domain/workbench";
 
@@ -22,10 +44,112 @@ function storedBlock(block: NewsletterBlock) {
     : { kind: "sponsored" as const, offerId: block.offer.id };
 }
 
+function ignoreDragActivation(event: { stopPropagation: () => void }) {
+  event.stopPropagation();
+}
+
+function BlockBody({
+  block,
+  blockKey,
+  interactive,
+}: {
+  block: NewsletterBlock;
+  blockKey: string;
+  interactive: boolean;
+}) {
+  return (
+    <>
+      <div className="drag-affordance" aria-hidden="true">
+        <span>⋮⋮</span>
+      </div>
+      <div className="selected-story-copy">
+        <p className="block-type-marker">{block.kind === "story" ? "Story" : "Sponsored"}</p>
+        <h3>{blockTitle(block)}</h3>
+      </div>
+      <div className="layout-block-actions">
+        {interactive ? (
+          <form
+            action={removeBlock}
+            data-no-drag="true"
+            onPointerDown={ignoreDragActivation}
+            onMouseDown={ignoreDragActivation}
+            onTouchStart={ignoreDragActivation}
+          >
+            <input type="hidden" name="blockKey" value={blockKey} />
+            <button
+              className="small-button remove-button"
+              type="submit"
+              aria-label={`Remove ${blockTitle(block)} from newsletter`}
+            >
+              Remove
+            </button>
+          </form>
+        ) : (
+          <button className="small-button remove-button" type="button" tabIndex={-1} disabled>
+            Remove
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
+
+function SortableBlock({
+  block,
+  blockKey,
+  isDropTarget,
+}: {
+  block: NewsletterBlock;
+  blockKey: string;
+  isDropTarget: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: blockKey,
+  });
+
+  return (
+    <li>
+      <div
+        ref={setNodeRef}
+        className={`layout-block${isDragging ? " is-dragging" : ""}${isDropTarget ? " is-drop-target" : ""}`}
+        style={{
+          transform: CSS.Transform.toString(transform),
+          transition,
+        }}
+        {...attributes}
+        {...listeners}
+        aria-label={`${block.kind === "story" ? "Story" : "Sponsored"}: ${blockTitle(block)}. Drag to reorder.`}
+      >
+        <BlockBody block={block} blockKey={blockKey} interactive />
+      </div>
+    </li>
+  );
+}
+
 export function LayoutWorkspace({ blocks }: LayoutWorkspaceProps) {
-  const [draggingKey, setDraggingKey] = useState<string | null>(null);
-  const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const [overKey, setOverKey] = useState<string | null>(null);
+  const mounted = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  );
   const keys = blocks.map((block) => layoutBlockKey(storedBlock(block)));
+  const activeBlock = blocks.find((block, index) => keys[index] === activeKey) ?? null;
+  const sensors = useSensors(
+    useSensor(MouseSensor, {
+      activationConstraint: { distance: 4 },
+    }),
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 4 },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 180, tolerance: 8 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
 
   async function persistOrder(nextKeys: string[]) {
     if (nextKeys.join("\0") === keys.join("\0")) {
@@ -34,23 +158,24 @@ export function LayoutWorkspace({ blocks }: LayoutWorkspaceProps) {
     await reorderLayout(nextKeys);
   }
 
-  async function handleDrop(targetIndex: number) {
-    if (draggingKey === null) {
+  function handleDragStart(event: DragStartEvent) {
+    setActiveKey(String(event.active.id));
+    setOverKey(String(event.active.id));
+  }
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    setActiveKey(null);
+    setOverKey(null);
+    if (!over || active.id === over.id) {
       return;
     }
-    const fromIndex = keys.indexOf(draggingKey);
-    if (fromIndex === -1) {
+    const fromIndex = keys.indexOf(String(active.id));
+    const toIndex = keys.indexOf(String(over.id));
+    if (fromIndex === -1 || toIndex === -1) {
       return;
     }
-    const nextKeys = [...keys];
-    const [moved] = nextKeys.splice(fromIndex, 1);
-    if (!moved) {
-      return;
-    }
-    nextKeys.splice(targetIndex, 0, moved);
-    setDraggingKey(null);
-    setDropIndex(null);
-    await persistOrder(nextKeys);
+    await persistOrder(arrayMove(keys, fromIndex, toIndex));
   }
 
   if (blocks.length === 0) {
@@ -63,86 +188,61 @@ export function LayoutWorkspace({ blocks }: LayoutWorkspaceProps) {
     );
   }
 
+  if (!mounted) {
+    return (
+      <ol className="layout-block-list">
+        {blocks.map((block, index) => {
+          const key = keys[index]!;
+          return (
+            <li key={key}>
+              <div
+                className="layout-block"
+                aria-label={`${block.kind === "story" ? "Story" : "Sponsored"}: ${blockTitle(block)}. Drag to reorder.`}
+              >
+                <BlockBody block={block} blockKey={key} interactive />
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    );
+  }
+
   return (
-    <ol className="layout-block-list">
-      {blocks.map((block, index) => {
-        const key = keys[index]!;
-        const isFirst = index === 0;
-        const isLast = index === blocks.length - 1;
-        return (
-          <li
-            key={key}
-            className={`layout-block${draggingKey === key ? " is-dragging" : ""}${dropIndex === index ? " is-drop-target" : ""}`}
-            onDragOver={(event) => {
-              event.preventDefault();
-              event.dataTransfer.dropEffect = "move";
-              setDropIndex(index);
-            }}
-            onDrop={async (event) => {
-              event.preventDefault();
-              await handleDrop(index);
-            }}
-          >
-            <div
-              className="drag-handle"
-              draggable
-              role="button"
-              tabIndex={0}
-              aria-label={`Drag to reorder ${blockTitle(block)}`}
-              onDragStart={(event) => {
-                event.dataTransfer.setData("text/plain", key);
-                event.dataTransfer.effectAllowed = "move";
-                setDraggingKey(key);
-                setDropIndex(index);
-              }}
-              onDragEnd={() => {
-                setDraggingKey(null);
-                setDropIndex(null);
-              }}
-            >
-              <span aria-hidden="true">⋮⋮</span>
-            </div>
-            <div className="selected-story-copy">
-              <p className="block-type-marker">{block.kind === "story" ? "Story" : "Sponsored"}</p>
-              <h3>{blockTitle(block)}</h3>
-            </div>
-            <div className="layout-block-actions">
-              <form action={moveBlockUp}>
-                <input type="hidden" name="blockKey" value={key} />
-                <button
-                  className="small-button move-button"
-                  type="submit"
-                  disabled={isFirst}
-                  aria-label={`Move ${blockTitle(block)} up`}
-                >
-                  Move up
-                </button>
-              </form>
-              <form action={moveBlockDown}>
-                <input type="hidden" name="blockKey" value={key} />
-                <button
-                  className="small-button move-button"
-                  type="submit"
-                  disabled={isLast}
-                  aria-label={`Move ${blockTitle(block)} down`}
-                >
-                  Move down
-                </button>
-              </form>
-              <form action={removeBlock}>
-                <input type="hidden" name="blockKey" value={key} />
-                <button
-                  className="small-button remove-button"
-                  type="submit"
-                  aria-label={`Remove ${blockTitle(block)} from newsletter`}
-                >
-                  Remove
-                </button>
-              </form>
-            </div>
-          </li>
-        );
-      })}
-    </ol>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      modifiers={[restrictToVerticalAxis]}
+      onDragStart={handleDragStart}
+      onDragOver={(event) => setOverKey(event.over ? String(event.over.id) : null)}
+      onDragCancel={() => {
+        setActiveKey(null);
+        setOverKey(null);
+      }}
+      onDragEnd={handleDragEnd}
+    >
+      <SortableContext items={keys} strategy={verticalListSortingStrategy}>
+        <ol className="layout-block-list">
+          {blocks.map((block, index) => {
+            const key = keys[index]!;
+            return (
+              <SortableBlock
+                key={key}
+                block={block}
+                blockKey={key}
+                isDropTarget={activeKey !== null && overKey === key && activeKey !== key}
+              />
+            );
+          })}
+        </ol>
+      </SortableContext>
+      <DragOverlay modifiers={[restrictToVerticalAxis]}>
+        {activeBlock && activeKey ? (
+          <div className="layout-block layout-block-overlay">
+            <BlockBody block={activeBlock} blockKey={activeKey} interactive={false} />
+          </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
   );
 }

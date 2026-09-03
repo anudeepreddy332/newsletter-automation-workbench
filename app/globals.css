@@ -902,16 +902,25 @@ select:hover { border-color: #9caaa1; }
   border: 1px solid var(--line);
   border-radius: 11px;
   background: var(--surface);
+  cursor: grab;
+  user-select: none;
 }
 
-.layout-block.is-dragging { opacity: 0.62; }
+.layout-block.is-dragging {
+  opacity: 0.4;
+}
 
 .layout-block.is-drop-target {
   border-color: var(--brand);
   box-shadow: 0 0 0 3px var(--brand-soft);
 }
 
-.drag-handle {
+.layout-block-overlay {
+  cursor: grabbing;
+  box-shadow: 0 14px 32px rgba(35, 55, 44, 0.18);
+}
+
+.drag-affordance {
   display: grid;
   width: 32px;
   height: 32px;
@@ -920,13 +929,11 @@ select:hover { border-color: #9caaa1; }
   border-radius: 8px;
   background: var(--surface-subtle);
   color: var(--ink-faint);
-  cursor: grab;
   font-size: 13px;
   font-weight: 800;
   letter-spacing: -0.12em;
+  pointer-events: none;
 }
-
-.drag-handle:active { cursor: grabbing; }
 
 .block-type-marker {
   margin: 0 0 4px;
@@ -942,11 +949,12 @@ select:hover { border-color: #9caaa1; }
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 6px;
+  cursor: default;
 }
 
-.move-button {
-  color: var(--ink-faint);
-  font-weight: 650;
+.layout-block .remove-button {
+  cursor: pointer;
+  pointer-events: auto;
 }
 
 .edit-layout-link {
