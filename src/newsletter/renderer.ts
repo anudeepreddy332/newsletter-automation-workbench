@@ -1,6 +1,11 @@
-import type { NewsletterAssemblyInput, RenderedNewsletter } from "@/src/domain/newsletter";
+import type {
+  NewsletterAssemblyInput,
+  NewsletterOfferInput,
+  NewsletterStoryInput,
+  RenderedNewsletter,
+} from "@/src/domain/newsletter";
 import {
-  POC_SPONSORED_LINKS_HEADING,
+  POC_SPONSORED_LABEL,
   placeNewsletterContent,
 } from "@/src/newsletter/placement";
 
@@ -17,55 +22,52 @@ function bodyParagraphs(body: string | undefined): string[] {
   return body?.split(/\n{2,}/).map((paragraph) => paragraph.trim()).filter(Boolean) ?? [];
 }
 
-function newsletterSubject(input: NewsletterAssemblyInput): string {
-  const firstStory = input.stories[0];
-  if (!firstStory) {
-    throw new Error("Newsletter rendering requires at least one selected story.");
+function firstStoryInput(input: NewsletterAssemblyInput): NewsletterStoryInput {
+  const firstStory = input.blocks.find((block) => block.kind === "story");
+  if (!firstStory || firstStory.kind !== "story") {
+    throw new Error("Newsletter rendering requires at least one story block.");
   }
-  return firstStory.title;
+  return firstStory.story;
+}
+
+function newsletterSubject(input: NewsletterAssemblyInput): string {
+  return firstStoryInput(input).title;
 }
 
 function newsletterPreheader(input: NewsletterAssemblyInput): string {
-  const firstStory = input.stories[0];
-  if (!firstStory) {
-    throw new Error("Newsletter rendering requires at least one selected story.");
-  }
-  return firstStory.summary;
+  return firstStoryInput(input).summary;
+}
+
+function renderStoryHtml(story: NewsletterStoryInput): string {
+  const paragraphs = bodyParagraphs(story.body)
+    .map((paragraph) => `    <p>${escapeHtml(paragraph)}</p>`)
+    .join("\n");
+  const bodyHtml = paragraphs.length > 0 ? `\n${paragraphs}` : "";
+  return `  <article>
+    <h2>${escapeHtml(story.title)}</h2>
+    <p>${escapeHtml(story.summary)}</p>${bodyHtml}
+    <p>Read more: ${escapeHtml(story.url)}</p>
+  </article>`;
+}
+
+function renderSponsoredHtml(offer: NewsletterOfferInput): string {
+  return `  <aside>
+    <p>${escapeHtml(POC_SPONSORED_LABEL)}</p>
+    <h2>${escapeHtml(offer.advertiserName)}</h2>
+    <p>${escapeHtml(offer.offerName)}</p>
+    <p>${escapeHtml(offer.trackingUrl)}</p>
+  </aside>`;
 }
 
 function renderHtml(input: NewsletterAssemblyInput): string {
   const subject = newsletterSubject(input);
   const preheader = newsletterPreheader(input);
   const placement = placeNewsletterContent(input);
-
-  const storyHtml = placement.stories
-    .map((story) => {
-      const paragraphs = bodyParagraphs(story.body)
-        .map((paragraph) => `    <p>${escapeHtml(paragraph)}</p>`)
-        .join("\n");
-      const bodyHtml = paragraphs.length > 0 ? `\n${paragraphs}` : "";
-      return `  <article>
-    <h2>${escapeHtml(story.title)}</h2>
-    <p>${escapeHtml(story.summary)}</p>${bodyHtml}
-    <p>Read more: ${escapeHtml(story.url)}</p>
-  </article>`;
-    })
-    .join("\n");
-
-  const sponsoredHtml = placement.sponsoredOffers.length === 0
-    ? ""
-    : `
-  <section>
-    <h2>${escapeHtml(POC_SPONSORED_LINKS_HEADING)}</h2>
-    <ul>
-${placement.sponsoredOffers
-    .map(
-      (offer) =>
-        `      <li>${escapeHtml(offer.advertiserName)} — ${escapeHtml(offer.offerName)}: ${escapeHtml(offer.trackingUrl)}</li>`,
+  const blocksHtml = placement.blocks
+    .map((block) =>
+      block.kind === "story" ? renderStoryHtml(block.story) : renderSponsoredHtml(block.offer),
     )
-    .join("\n")}
-    </ul>
-  </section>`;
+    .join("\n");
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -76,50 +78,53 @@ ${placement.sponsoredOffers
 <body>
   <h1>${escapeHtml(subject)}</h1>
   <p>${escapeHtml(preheader)}</p>
-${storyHtml}${sponsoredHtml}
+${blocksHtml}
 </body>
 </html>
 `;
+}
+
+function renderStoryPlainText(story: NewsletterStoryInput): string {
+  const paragraphs = bodyParagraphs(story.body);
+  const body = paragraphs.length > 0 ? `\n\n${paragraphs.join("\n\n")}` : "";
+  return `${story.title}
+
+${story.summary}${body}
+
+Read more: ${story.url}`;
+}
+
+function renderSponsoredPlainText(offer: NewsletterOfferInput): string {
+  return `${POC_SPONSORED_LABEL}
+
+${offer.advertiserName}
+${offer.offerName}
+${offer.trackingUrl}`;
 }
 
 function renderPlainText(input: NewsletterAssemblyInput): string {
   const subject = newsletterSubject(input);
   const preheader = newsletterPreheader(input);
   const placement = placeNewsletterContent(input);
-
-  const storyText = placement.stories
-    .map((story, index) => {
-      const paragraphs = bodyParagraphs(story.body);
-      const body = paragraphs.length > 0 ? `\n\n${paragraphs.join("\n\n")}` : "";
-      return `${index + 1}. ${story.title}
-
-${story.summary}${body}
-
-Read more: ${story.url}`;
-    })
+  const blocksText = placement.blocks
+    .map((block) =>
+      block.kind === "story"
+        ? renderStoryPlainText(block.story)
+        : renderSponsoredPlainText(block.offer),
+    )
     .join("\n\n");
-
-  const sponsoredText = placement.sponsoredOffers.length === 0
-    ? ""
-    : `
-
-${POC_SPONSORED_LINKS_HEADING}
-
-${placement.sponsoredOffers
-    .map((offer) => `• ${offer.advertiserName} — ${offer.offerName}\n  ${offer.trackingUrl}`)
-    .join("\n")}`;
 
   return `Subject: ${subject}
 
 ${preheader}
 
-${storyText}${sponsoredText}
+${blocksText}
 `;
 }
 
 export function renderNewsletter(input: NewsletterAssemblyInput): RenderedNewsletter {
-  if (input.stories.length === 0) {
-    throw new Error("Newsletter rendering requires at least one selected story.");
+  if (!input.blocks.some((block) => block.kind === "story")) {
+    throw new Error("Newsletter rendering requires at least one story block.");
   }
 
   return {

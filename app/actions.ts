@@ -12,6 +12,22 @@ function requiredValue(formData: FormData, field: string): string {
   return value;
 }
 
+function collectedValues(formData: FormData, field: string): string[] {
+  return formData
+    .getAll(field)
+    .filter((value): value is string => typeof value === "string" && value.length > 0);
+}
+
+export async function fetchLatestStories(): Promise<void> {
+  await workbenchService.fetchLatestStories();
+  revalidatePath("/");
+}
+
+export async function addSelectedStories(formData: FormData): Promise<void> {
+  await workbenchService.addStories(collectedValues(formData, "storyId"));
+  revalidatePath("/");
+}
+
 export async function addStory(formData: FormData): Promise<void> {
   await workbenchService.addStory(requiredValue(formData, "storyId"));
   revalidatePath("/");
@@ -22,19 +38,34 @@ export async function removeStory(formData: FormData): Promise<void> {
   revalidatePath("/");
 }
 
-export async function moveStoryUp(formData: FormData): Promise<void> {
-  await workbenchService.moveStoryUp(requiredValue(formData, "storyId"));
+export async function removeBlock(formData: FormData): Promise<void> {
+  await workbenchService.removeBlock(requiredValue(formData, "blockKey"));
   revalidatePath("/");
 }
 
-export async function moveStoryDown(formData: FormData): Promise<void> {
-  await workbenchService.moveStoryDown(requiredValue(formData, "storyId"));
+export async function moveBlockUp(formData: FormData): Promise<void> {
+  await workbenchService.moveBlock(requiredValue(formData, "blockKey"), "up");
+  revalidatePath("/");
+}
+
+export async function moveBlockDown(formData: FormData): Promise<void> {
+  await workbenchService.moveBlock(requiredValue(formData, "blockKey"), "down");
+  revalidatePath("/");
+}
+
+export async function reorderLayout(blockKeys: string[]): Promise<void> {
+  await workbenchService.reorderLayout(blockKeys);
   revalidatePath("/");
 }
 
 export async function publishSelectedStories(formData: FormData): Promise<void> {
   const mode = formData.get("mode") === "real" ? "real" : "mock";
   await workbenchService.publishSelectedStories(mode);
+  revalidatePath("/");
+}
+
+export async function addSelectedOffers(formData: FormData): Promise<void> {
+  await workbenchService.addOffers(collectedValues(formData, "offerId"));
   revalidatePath("/");
 }
 

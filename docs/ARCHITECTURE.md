@@ -5,23 +5,23 @@
 This document freezes a single-operator, modular POC architecture rather than
 a production design. It makes a controlled newsletter workflow demonstrable
 offline with deterministic fixtures and mocks. Human decisions remain explicit
-at story selection, offer selection, and approval; no stage sends email.
+at fetch, story selection, offer selection, layout arrangement, and approval;
+no stage sends email.
 
 ## Concise architecture
 
 ```text
-RSS fixture -> ContentSource -> normalized Story records -> SQLite
+RSS fixture -> explicit Fetch latest stories -> ContentSource.read()
+             -> normalize -> upsert Story records -> SQLite
                                                 |
                                                 v
                                      Single Operator Workbench
-                                      select/order stories
+                          choose stories / choose advertiser links
+                          arrange one mixed Story/Sponsored layout
                                                 |
                                                 v
-                                ContentPublisher contract
-                           MockWordPress | RealWordPress (optional)
-                                                |
-                                                v
-                         choose Mock Everflow-style offers -> tracking URLs
+                         Generate newsletter (MockWordPress story pages)
+                           RealWordPress never called by Generate
                                                 |
                                                 v
                       deterministic newsletter renderer -> HTML/text preview
@@ -37,8 +37,8 @@ email send.
 
 | Component | Responsibility | Must not do |
 | --- | --- | --- |
-| Single Operator Workbench | Starts the manual flow; shows story browsing, selection/order, offer choice, preview, approval, and outcome. | Make automatic editorial or approval decisions. |
-| `ContentSource` adapter | Reads controlled RSS fixtures and normalizes provider-shaped items into domain `Story` records. | Expose raw RSS/XML to the application domain or claim live-feed compatibility. |
+| Single Operator Workbench | Starts the manual flow; shows explicit fetch, story browsing, multi-select, mixed-block arrangement, preview, approval, and outcome. | Make automatic editorial or approval decisions, auto-fetch on page load, or call RealWordPress during Generate. |
+| `ContentSource` adapter | Reads controlled RSS fixtures and normalizes provider-shaped items into domain `Story` records when Fetch latest stories is invoked. | Expose raw RSS/XML to the application domain, claim live-feed compatibility, or run on a scheduler. |
 | Content persistence | Stores normalized content, future draft state, and the minimum state needed for deterministic POC behavior. | Create production data models outside the active milestone. |
 | `ContentPublisher` contract | Defines a shared publishing/resolution request and normalized result. | Hide adapter failures or choose a fallback adapter. |
 | `MockWordPress` | Required/default deterministic publisher with visible status, post ID, and URL. | Use a network connection or credentials. |
@@ -57,7 +57,13 @@ email send.
 The initial source contract is **Benzinga-shaped RSS** and is deliberately
 provisional. It exists only as fictional, controlled fixture data until a
 representative stakeholder feed is available. The domain consumes normalized
-`Story` records; it does not depend on raw provider XML structures.
+`Story` records; it does not depend on raw provider XML structures. Fetch
+latest stories is an explicit provider-neutral refresh:
+`ContentSource.read()` -> normalize -> upsert content feed/stories. Page load
+does not read the source. Repeated fetch is idempotent and does not delete
+persisted or selected stories. No scheduler, cron, background worker, queue, or
+polling is implemented. The same refresh operation could later be invoked by a
+scheduler.
 
 `ContentFeed` identifies that source. `Publication` is deliberately reserved
 for the future newsletter brand/publication configuration selected by the
@@ -77,40 +83,43 @@ must not retry through, or be represented as, MockWordPress.
 ### Offers and rendering
 
 The POC uses a Mock Everflow-style adapter only. The operator may choose zero or
-more offers; the adapter supplies each tracking URL. Selected offers are stored
-against the draft in selection order. That order is not advertisement placement.
+more offers; the adapter supplies each tracking URL. Selected stories and offers
+become blocks in one persisted mixed layout. That layout is the authoritative
+source of newsletter order. Human placement is the advertisement placement
+policy for this POC. There is no automatic advertisement placement and no
+trailing Sponsored links regrouping.
 
-The renderer then creates exact HTML and plain text from the selected stories,
+The renderer then creates exact HTML and plain text from the ordered layout,
 resolved publishing data when present, and selected offers. It is deterministic
-and does not make editorial decisions.
-
-Phase 4 uses one bounded POC placement convention: selected offers appear only
-in a final **Sponsored links** section, after all editorial stories, in
-selection order. This is a deterministic POC placement convention, not the
-target production placement policy. Placement logic is isolated from offer
-selection and persistence so it can be replaced later.
+and does not make editorial decisions. Subject and preheader use the first Story
+block in layout order, even if a Sponsored block appears first. The production
+subject/preheader contract remains unvalidated.
 
 ### Preview, approval, and staging
 
 The exact rendered HTML and plain text must be previewed before a human
 approves a snapshot. Approval is a deliberate operator action and binds to the
 exact generated subject, preheader, HTML, plain text, and input fingerprint.
-Any later change that makes generated output stale invalidates that approval
-for staging. `NewsletterStager` is the provider-neutral staging boundary.
+The unified layout order participates in that identity. Any later block
+reorder, add, removal, resolved story URL change, or relevant story/offer
+input change makes generated output stale and invalidates approval for
+staging. `NewsletterStager` is the provider-neutral staging boundary.
 `MockIterable` stages only the approved snapshot, guards against duplicate
 staging, and returns a visible receipt. It never sends email. The real
 Iterable contract remains unvalidated.
 
 ## Data flow and known boundary
 
-1. `ContentSource` reads a controlled fixture and returns normalized stories.
-2. The single operator chooses a newsletter brand/publication, stories, order,
-   and zero or more Mock Everflow-style offers.
-3. The selected stories pass through the WordPress publishing/resolution
-   boundary.
-4. The renderer builds exact HTML and plain text from the selected inputs.
-5. The workbench previews the output, records human approval, and stages the
-   approved snapshot to Mock Iterable.
+1. The operator explicitly fetches the controlled fixture; `ContentSource`
+   returns normalized stories and they are upserted.
+2. The single operator chooses a newsletter brand/publication internally,
+   stories, optional Mock Everflow-style offers, and a mixed layout order.
+3. Generate newsletter resolves story pages through MockWordPress when no
+   usable published URL exists. A previously recorded RealWordPress result may
+   be used if already present. Generate never issues a real network write.
+4. The renderer builds exact HTML and plain text from the unified layout.
+5. The workbench previews the output, records human approval of that exact
+   snapshot, and stages the approved snapshot to Mock Iterable.
 6. Mock Iterable returns a receipt; the POC stops.
 
 The precise WordPress-to-newsletter input remains unresolved: URL, excerpt,
@@ -121,7 +130,7 @@ No implementation may infer that payload before it is supplied.
 
 | Behavior | POC mock behavior | Optional genuine behavior |
 | --- | --- | --- |
-| RSS | Controlled Benzinga-shaped fixture | No live compatibility claim |
+| RSS | Controlled Benzinga-shaped fixture, explicit fetch only | No live compatibility claim and no scheduler |
 | WordPress | Deterministic MockWordPress result | One disposable WordPress.com test site only, after 3A |
 | Offers | Deterministic Mock Everflow-style catalog | No real Everflow integration |
 | Delivery | Mock Iterable stage-only receipt | No real Iterable integration or email send |

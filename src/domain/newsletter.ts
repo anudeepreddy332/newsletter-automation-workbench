@@ -11,9 +11,20 @@ export type NewsletterOfferInput = {
   trackingUrl: string;
 };
 
+export type NewsletterStoryBlockInput = {
+  kind: "story";
+  story: NewsletterStoryInput;
+};
+
+export type NewsletterSponsoredBlockInput = {
+  kind: "sponsored";
+  offer: NewsletterOfferInput;
+};
+
+export type NewsletterBlockInput = NewsletterStoryBlockInput | NewsletterSponsoredBlockInput;
+
 export type NewsletterAssemblyInput = {
-  stories: NewsletterStoryInput[];
-  offers: NewsletterOfferInput[];
+  blocks: NewsletterBlockInput[];
 };
 
 export type RenderedNewsletter = {

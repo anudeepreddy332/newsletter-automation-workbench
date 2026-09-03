@@ -18,8 +18,10 @@ export function StageIterablePanel({
     <section className="workflow-panel stage-panel" aria-labelledby="stage-heading">
       <div className="panel-heading">
         <div>
-          <h2 id="stage-heading">5. Stage to Iterable</h2>
-          <p>Stages the approved newsletter to a simulated Iterable destination.</p>
+          <h2 id="stage-heading">7. Stage to Iterable</h2>
+          <p>
+            Mock Iterable only. This creates or prepares a mock draft. This does not send email.
+          </p>
         </div>
       </div>
 

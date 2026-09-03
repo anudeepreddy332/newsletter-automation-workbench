@@ -1,4 +1,5 @@
 import type { Offer } from "@/src/domain/offer";
+import type { NewsletterBlock } from "@/src/domain/workbench";
 import type {
   NewsletterAssemblyInput,
   NewsletterOfferInput,
@@ -18,6 +19,15 @@ function publishedUrlForMode(
     }
   }
   return undefined;
+}
+
+export function hasUsablePublishedUrl(
+  storyId: string,
+  publishingResults: readonly PublishingResult[] = [],
+): boolean {
+  return publishingResults.some(
+    (result) => result.sourceStoryId === storyId && result.status === "published",
+  );
 }
 
 export function resolveNewsletterStoryUrl(
@@ -52,12 +62,14 @@ function toOfferInput(offer: Offer): NewsletterOfferInput {
 }
 
 export function buildNewsletterAssemblyInput(
-  stories: readonly Story[],
-  offers: readonly Offer[],
+  layout: readonly NewsletterBlock[],
   publishingResults: readonly PublishingResult[] = [],
 ): NewsletterAssemblyInput {
   return {
-    stories: stories.map((story) => toStoryInput(story, publishingResults)),
-    offers: offers.map(toOfferInput),
+    blocks: layout.map((block) =>
+      block.kind === "story"
+        ? { kind: "story", story: toStoryInput(block.story, publishingResults) }
+        : { kind: "sponsored", offer: toOfferInput(block.offer) },
+    ),
   };
 }

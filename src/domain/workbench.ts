@@ -10,9 +10,28 @@ export type Publication = {
   name: string;
 };
 
+export type StoryBlock = {
+  kind: "story";
+  story: Story;
+};
+
+export type SponsoredBlock = {
+  kind: "sponsored";
+  offer: Offer;
+};
+
+export type NewsletterBlock = StoryBlock | SponsoredBlock;
+
+export type FetchStoriesResult = {
+  contentFeedId: string;
+  fetchedCount: number;
+  availableCount: number;
+};
+
 export type Draft = {
   id: string;
   publicationId?: string;
+  layout: NewsletterBlock[];
   selectedStories: Story[];
   selectedOffers: Offer[];
 };

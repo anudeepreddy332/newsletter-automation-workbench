@@ -4,9 +4,10 @@
 
 The Newsletter Automation Workbench POC makes a stakeholder-reported,
 multi-step newsletter workflow deterministic, inspectable, and safe to demo.
-It connects controlled story intake, manual editorial choices, mock publishing,
-offer-link selection, deterministic rendering, approval, and staging without
-claiming production automation or sending email.
+It connects an explicit local story fetch, manual editorial choices, a unified
+mixed-block layout, automatic Mock WordPress story-page resolution, deterministic
+rendering, exact preview, approval, and staging without claiming production
+automation or sending email.
 
 ## Current stakeholder-reported workflow
 
@@ -28,17 +29,16 @@ must not invent that contract.
 
 ```text
 Benzinga-shaped RSS fixtures
-  -> ContentSource adapter
+  -> explicit Fetch latest stories
+       ContentSource.read() -> normalize -> upsert
   -> Single Operator Workbench
-  -> operator selects and orders stories
-  -> WordPress publishing/resolution
-       MockWordPress required/default
-       RealWordPress optional later
-  -> operator selects zero or more Mock Everflow-style offers
-  -> offer adapter provides tracking URLs
-  -> deterministic newsletter renderer
+  -> operator chooses stories and optional advertiser links
+  -> operator arranges one mixed Story/Sponsored layout
+  -> Generate newsletter
+       MockWordPress resolves story pages automatically
+       RealWordPress is never called by Generate
   -> exact HTML and plain-text preview
-  -> human approval
+  -> human approval of that exact snapshot
   -> stage approved snapshot to Mock Iterable
   -> display receipt
 ```
@@ -67,9 +67,15 @@ The numeric site ID comes from the authenticated
 
 - One modular application and one operator.
 - Deterministic, fixture-backed RSS intake through a `ContentSource` adapter.
-- Manual story selection and ordering.
-- `MockWordPress` as the required/default deterministic publisher; optional
-  `RealWordPress` for one disposable WordPress.com test site after Milestone 3A.
+  The operator must fetch explicitly. Page load does not read the source, and
+  no scheduler is implemented. The explicit refresh operation could later be
+  invoked by a scheduler.
+- Manual story and advertiser multi-select, plus one persisted mixed-block
+  layout. Human placement is the advertisement placement policy for this POC.
+- `MockWordPress` as the required/default deterministic publisher. Generate
+  resolves story pages through Mock WordPress automatically. Optional
+  `RealWordPress` remains a collapsed test control for one disposable
+  WordPress.com test site after Milestone 3A.
 - A mock Everflow-style offer catalog and tracking URLs.
 - Deterministic newsletter HTML and plain-text rendering.
 - Exact preview, human approval of that exact snapshot, approval invalidation
@@ -97,8 +103,10 @@ The numeric site ID comes from the authenticated
 The POC demo succeeds only when it proves all applicable steps with visible,
 honest results:
 
-1. The same controlled fixture yields the same normalized stories.
-2. The single operator can select and order stories and select mock offers.
+1. The same controlled fixture yields the same normalized stories after an
+   explicit fetch.
+2. The single operator can choose stories and mock offers, then arrange a mixed
+   Story/Sponsored layout.
 3. Mock WordPress, Mock Everflow, and Mock Iterable each work independently
    and identify their own deterministic result.
 4. The renderer produces exact, deterministic HTML and plain-text previews.

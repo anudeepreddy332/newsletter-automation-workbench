@@ -10,7 +10,7 @@ import { MockWordPress } from "@/src/adapters/publishing/mock-wordpress";
 import { openContentDatabase } from "@/src/db/database";
 import { applyContentFoundationMigrations } from "@/src/db/migrate";
 import type { ContentDatabase } from "@/src/db/database";
-import { draftOffers } from "@/src/db/schema";
+import { draftBlocks } from "@/src/db/schema";
 import { ContentRepository } from "@/src/repositories/content-repository";
 import { WorkbenchRepository } from "@/src/repositories/workbench-repository";
 import { WorkbenchService, WorkbenchServiceError } from "@/src/workbench/workbench-service";
@@ -38,6 +38,7 @@ async function withWorkbench(
     new WorkbenchRepository(db),
     new MockWordPress(),
   );
+  await service.fetchLatestStories();
 
   try {
     await run(service, db);
@@ -160,7 +161,7 @@ test("stories and offers remain separate domain concepts", async () => {
       state.draft.selectedOffers.some((offer) => offer.id === firstStoryId),
       false,
     );
-    assert.equal(db.select().from(draftOffers).all().length, 2);
+    assert.equal(db.select().from(draftBlocks).all().length, 4);
   });
 });
 

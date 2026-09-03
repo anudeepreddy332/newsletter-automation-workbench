@@ -48,6 +48,7 @@ async function withContentSource(
   run: (service: WorkbenchService, db: ContentDatabase) => Promise<void>,
   publisher: ContentPublisher = new MockWordPress(),
   realPublisher: ContentPublisher | null = null,
+  options: { fetchStories?: boolean } = {},
 ): Promise<void> {
   const temporaryDirectory = mkdtempSync(path.join(tmpdir(), "newsletter-workbench-"));
   const databasePath = path.join(temporaryDirectory, "workbench.db");
@@ -60,6 +61,9 @@ async function withContentSource(
     publisher,
     realPublisher,
   );
+  if (options.fetchStories !== false) {
+    await service.fetchLatestStories();
+  }
 
   try {
     await run(service, db);
@@ -245,10 +249,11 @@ test("a legacy local draft is reassigned safely while its prior results remain v
   });
 });
 
-test("the operator UI is vertical with story, advertiser, generate, review, and stage steps", () => {
+test("the operator UI is vertical with fetch, choose, arrange, generate, review, and stage steps", () => {
   const workbenchSource = readFileSync(path.join(process.cwd(), "app/workbench.tsx"), "utf8");
   const storyPickerSource = readFileSync(path.join(process.cwd(), "app/story-picker.tsx"), "utf8");
   const offerPickerSource = readFileSync(path.join(process.cwd(), "app/offer-picker.tsx"), "utf8");
+  const layoutSource = readFileSync(path.join(process.cwd(), "app/layout-workspace.tsx"), "utf8");
   const generatedSource = readFileSync(path.join(process.cwd(), "app/generated-newsletter.tsx"), "utf8");
   const reviewSource = readFileSync(path.join(process.cwd(), "app/review-approve.tsx"), "utf8");
   const stageSource = readFileSync(path.join(process.cwd(), "app/stage-iterable.tsx"), "utf8");
@@ -257,36 +262,54 @@ test("the operator UI is vertical with story, advertiser, generate, review, and 
   assert.doesNotMatch(workbenchSource, /publicationId|selectPublication|Save choice/);
   assert.doesNotMatch(workbenchSource, /workflow-overview|panel-step|Choose newsletter/);
   assert.doesNotMatch(workbenchSource, /Daily Dispatch|Market Brief/);
-  assert.doesNotMatch(workbenchSource, /moveStoryUp|moveStoryDown|Move .* up|Move .* down/);
-  assert.match(workbenchSource, /1\. Choose stories/);
-  assert.match(workbenchSource, /2\. Choose advertiser links/);
-  assert.match(workbenchSource, /Stories added/);
-  assert.match(workbenchSource, /Advertiser links added/);
-  assert.match(generatedSource, /3\. Generate newsletter/);
-  assert.match(reviewSource, /4\. Review and approve/);
+  assert.doesNotMatch(workbenchSource, /Stories added|Advertiser links added/);
+  assert.match(workbenchSource, /1\. Fetch stories/);
+  assert.match(workbenchSource, /Fetch latest stories/);
+  assert.match(workbenchSource, /2\. Choose stories/);
+  assert.match(workbenchSource, /3\. Choose advertiser links/);
+  assert.match(workbenchSource, /4\. Arrange newsletter/);
+  assert.match(generatedSource, /5\. Generate and preview/);
+  assert.match(generatedSource, /Edit layout/);
+  assert.match(generatedSource, /newsletter-frame/);
+  assert.match(reviewSource, /6\. Review and approve/);
   assert.match(reviewSource, /Approve newsletter/);
-  assert.match(reviewSource, /Status: \{approvalIsCurrent \? "Approved" : "Not approved"\}/);
-  assert.match(stageSource, /5\. Stage to Iterable/);
-  assert.match(stageSource, /simulated Iterable destination/);
+  assert.match(reviewSource, /Not approved/);
+  assert.doesNotMatch(reviewSource, /iframe|srcDoc/);
+  assert.match(stageSource, /7\. Stage to Iterable/);
+  assert.match(stageSource, /Mock Iterable only/);
+  assert.match(stageSource, /does not send email/);
   assert.match(stageSource, /Stage approved newsletter/);
   assert.doesNotMatch(stageSource, /\bSent\b|Delivered|Campaign launched/);
-  assert.match(offerPickerSource, /Add advertiser link/);
-  assert.match(offerPickerSource, /Sample tracking URL/);
+  assert.match(offerPickerSource, /Add selected links/);
+  assert.match(offerPickerSource, /Choose advertiser links/);
+  assert.match(offerPickerSource, /type="checkbox"/);
+  assert.match(workbenchSource, /Sample advertiser offers are used in this prototype/);
   assert.doesNotMatch(offerPickerSource, /<a(?:\s|>)|href=/);
-  assert.match(storyPickerSource, /View full story/);
-  assert.match(storyPickerSource, /Add to newsletter/);
-  assert.match(storyPickerSource, /selectedStory\?\.body/);
-  assert.doesNotMatch(storyPickerSource, /— in newsletter|In newsletter/);
+  assert.match(storyPickerSource, /Choose stories/);
+  assert.match(storyPickerSource, /Fetch stories first/);
+  assert.match(storyPickerSource, /Add selected stories/);
+  assert.match(storyPickerSource, /type="checkbox"/);
+  assert.match(storyPickerSource, /View/);
+  assert.doesNotMatch(storyPickerSource, /<select|Add to newsletter/);
   assert.doesNotMatch(storyPickerSource, /<a(?:\s|>)|href=/);
+  assert.match(layoutSource, /Move up/);
+  assert.match(layoutSource, /Move down/);
+  assert.match(layoutSource, /draggable/);
+  assert.match(layoutSource, /Story|Sponsored/);
   assert.doesNotMatch(workbenchSource, /Everflow|afterStoryId|relevance score/);
-  assert.doesNotMatch(generatedSource, /Iterable|approve|Approval/);
+  assert.doesNotMatch(generatedSource, /Iterable|Approve newsletter/);
+  assert.match(actionsSource, /fetchLatestStories/);
   assert.match(actionsSource, /approveNewsletter/);
   assert.match(actionsSource, /stageApprovedNewsletter/);
+  assert.match(workbenchSource, /WordPress test evidence/);
+  assert.match(workbenchSource, /Optional publishing test details/);
+  assert.match(workbenchSource, /<details className="workflow-panel wordpress-evidence">/);
   assert.match(workbenchSource, /REAL WORDPRESS\.COM TEST SITE/);
   assert.match(workbenchSource, /result\.sourceStoryId === story\.id/);
   assert.doesNotMatch(workbenchSource, /WORDPRESS_ACCESS_TOKEN|name="accessToken"|name="siteId"|type="password"/);
   assert.doesNotMatch(actionsSource, /WORDPRESS_ACCESS_TOKEN|accessToken|siteId/);
   assert.doesNotMatch(actionsSource, /selectPublication/);
+  assert.doesNotMatch(workbenchSource, /cron|scheduler|setInterval|node-cron/);
 });
 
 test("story dropdown labels remain clean after a story is added", async () => {
@@ -322,8 +345,11 @@ test("workbench loads stories from the content feed returned by its source", asy
   };
 
   await withContentSource(alternateSource, async (service, db) => {
+    const beforeFetch = await service.load();
+    await service.fetchLatestStories();
     const state = await service.load();
 
+    assert.deepEqual(beforeFetch.availableStories, []);
     assert.deepEqual(
       db.select().from(contentFeeds).where(eq(contentFeeds.id, alternateContentFeed.id)).get(),
       alternateContentFeed,
@@ -337,7 +363,7 @@ test("workbench loads stories from the content feed returned by its source", asy
         sourceItemId: undefined,
       },
     ]);
-  });
+  }, new MockWordPress(), null, { fetchStories: false });
 });
 
 test("preparation works without operator publication selection", async () => {

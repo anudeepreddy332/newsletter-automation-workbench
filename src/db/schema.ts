@@ -40,30 +40,19 @@ export const drafts = sqliteTable("drafts", {
   generatedInputFingerprint: text("generated_input_fingerprint"),
 });
 
-export const draftStories = sqliteTable(
-  "draft_stories",
+export const draftBlocks = sqliteTable(
+  "draft_blocks",
   {
     draftId: text("draft_id")
       .notNull()
       .references(() => drafts.id, { onDelete: "cascade" }),
-    storyId: text("story_id")
-      .notNull()
-      .references(() => stories.id),
+    blockKey: text("block_key").notNull(),
     position: integer("position").notNull(),
+    kind: text("kind").notNull(),
+    storyId: text("story_id").references(() => stories.id),
+    offerId: text("offer_id"),
   },
-  (table) => [primaryKey({ columns: [table.draftId, table.storyId] })],
-);
-
-export const draftOffers = sqliteTable(
-  "draft_offers",
-  {
-    draftId: text("draft_id")
-      .notNull()
-      .references(() => drafts.id, { onDelete: "cascade" }),
-    offerId: text("offer_id").notNull(),
-    position: integer("position").notNull(),
-  },
-  (table) => [primaryKey({ columns: [table.draftId, table.offerId] })],
+  (table) => [primaryKey({ columns: [table.draftId, table.blockKey] })],
 );
 
 export const publishingResults = sqliteTable(

@@ -11,7 +11,7 @@ import { applyContentFoundationMigrations } from "@/src/db/migrate";
 import type { NewsletterAssemblyInput } from "@/src/domain/newsletter";
 import { buildNewsletterAssemblyInput, resolveNewsletterStoryUrl } from "@/src/newsletter/assembly";
 import { fingerprintNewsletterInput } from "@/src/newsletter/fingerprint";
-import { POC_SPONSORED_LINKS_HEADING, placeNewsletterContent } from "@/src/newsletter/placement";
+import { POC_SPONSORED_LABEL, placeNewsletterContent } from "@/src/newsletter/placement";
 import { escapeHtml, renderNewsletter } from "@/src/newsletter/renderer";
 import { ContentRepository } from "@/src/repositories/content-repository";
 import { WorkbenchRepository } from "@/src/repositories/workbench-repository";
@@ -28,29 +28,39 @@ const secondOfferId = "offer_northstar_brokerage";
 const thirdOfferId = "offer_ledgerbay_software";
 
 const controlledInput: NewsletterAssemblyInput = {
-  stories: [
+  blocks: [
     {
-      title: `Rates <script>alert("x")</script> & "quotes"`,
-      summary: "A controlled summary with <b>markup</b>.",
-      body: "First paragraph.\n\nSecond paragraph with & ampersands.",
-      url: "https://fixture.example.test/news/controlled-story",
+      kind: "story",
+      story: {
+        title: `Rates <script>alert("x")</script> & "quotes"`,
+        summary: "A controlled summary with <b>markup</b>.",
+        body: "First paragraph.\n\nSecond paragraph with & ampersands.",
+        url: "https://fixture.example.test/news/controlled-story",
+      },
     },
     {
-      title: "Second controlled story",
-      summary: "Second summary.",
-      url: "https://fixture.example.test/news/second-controlled-story",
-    },
-  ],
-  offers: [
-    {
-      advertiserName: "Harborline Savings",
-      offerName: "High-yield savings <trial>",
-      trackingUrl: "https://offers-fixture.test/track/harborline-savings",
+      kind: "story",
+      story: {
+        title: "Second controlled story",
+        summary: "Second summary.",
+        url: "https://fixture.example.test/news/second-controlled-story",
+      },
     },
     {
-      advertiserName: "Northstar Brokerage",
-      offerName: "Self-directed investing starter kit",
-      trackingUrl: "https://offers-fixture.test/track/northstar-brokerage",
+      kind: "sponsored",
+      offer: {
+        advertiserName: "Harborline Savings",
+        offerName: "High-yield savings <trial>",
+        trackingUrl: "https://offers-fixture.test/track/harborline-savings",
+      },
+    },
+    {
+      kind: "sponsored",
+      offer: {
+        advertiserName: "Northstar Brokerage",
+        offerName: "Self-directed investing starter kit",
+        trackingUrl: "https://offers-fixture.test/track/northstar-brokerage",
+      },
     },
   ],
 };
@@ -78,6 +88,7 @@ async function withWorkbench(
     new WorkbenchRepository(db),
     new MockWordPress(),
   );
+  await service.fetchLatestStories();
 
   try {
     await run(service);
@@ -94,8 +105,8 @@ test("renderer HTML and plain text are deterministic for the same inputs", () =>
     const second = renderNewsletter(controlledInput);
 
     assert.deepEqual(second, first);
-    assert.equal(first.subject, controlledInput.stories[0]?.title);
-    assert.equal(first.preheader, controlledInput.stories[0]?.summary);
+    assert.equal(first.subject, `Rates <script>alert("x")</script> & "quotes"`);
+    assert.equal(first.preheader, "A controlled summary with <b>markup</b>.");
     assert.equal(fingerprintNewsletterInput(controlledInput), fingerprintNewsletterInput(controlledInput));
   } finally {
     restoreFetch();
@@ -124,23 +135,32 @@ test("plain-text renderer is deterministic and includes selected stories", () =>
   assert.doesNotMatch(first, /Date\.now|new Date\(/);
 });
 
-test("multiple offers appear in selection order in a final sponsored section", () => {
-  const rendered = renderNewsletter(controlledInput);
-  const placement = placeNewsletterContent(controlledInput);
-  const htmlSponsoredIndex = rendered.html.indexOf(POC_SPONSORED_LINKS_HEADING);
-  const firstStoryIndex = rendered.html.indexOf("Second controlled story");
+test("renderer follows exact mixed block order instead of regrouping by type", () => {
+  const interleaved: NewsletterAssemblyInput = {
+    blocks: [
+      controlledInput.blocks[0]!,
+      controlledInput.blocks[2]!,
+      controlledInput.blocks[1]!,
+      controlledInput.blocks[3]!,
+    ],
+  };
+  const rendered = renderNewsletter(interleaved);
+  const placement = placeNewsletterContent(interleaved);
+  const firstStoryIndex = rendered.html.indexOf("Rates");
   const firstOfferIndex = rendered.html.indexOf("Harborline Savings");
+  const secondStoryIndex = rendered.html.indexOf("Second controlled story");
   const secondOfferIndex = rendered.html.indexOf("Northstar Brokerage");
 
   assert.deepEqual(
-    placement.sponsoredOffers.map((offer) => offer.offerName),
-    controlledInput.offers.map((offer) => offer.offerName),
+    placement.blocks.map((block) => block.kind),
+    ["story", "sponsored", "story", "sponsored"],
   );
-  assert.ok(htmlSponsoredIndex > firstStoryIndex);
-  assert.ok(firstOfferIndex > htmlSponsoredIndex);
-  assert.ok(secondOfferIndex > firstOfferIndex);
-  assert.match(rendered.plainText, new RegExp(`${POC_SPONSORED_LINKS_HEADING}\\n\\n• Harborline Savings`));
-  assert.equal(rendered.html.split(POC_SPONSORED_LINKS_HEADING).length - 1, 1);
+  assert.ok(firstStoryIndex < firstOfferIndex);
+  assert.ok(firstOfferIndex < secondStoryIndex);
+  assert.ok(secondStoryIndex < secondOfferIndex);
+  assert.match(rendered.html, new RegExp(`${POC_SPONSORED_LABEL}[\\s\\S]*Harborline Savings[\\s\\S]*Second controlled story`));
+  assert.doesNotMatch(rendered.html, /Sponsored links/);
+  assert.match(rendered.plainText, /Sponsored\n\nHarborline Savings/);
 });
 
 test("renderer does not claim intelligent advertisement placement", () => {
@@ -155,20 +175,24 @@ test("assembly input stays provider-neutral", () => {
   const input = buildNewsletterAssemblyInput(
     [
       {
-        id: "story_controlled",
-        contentFeedId: "content_feed_controlled",
-        title: "Controlled story",
-        summary: "Controlled summary.",
-        canonicalUrl: "https://fixture.example.test/news/controlled-story",
-        publishedAt: "2026-09-02T06:00:00.000Z",
+        kind: "story",
+        story: {
+          id: "story_controlled",
+          contentFeedId: "content_feed_controlled",
+          title: "Controlled story",
+          summary: "Controlled summary.",
+          canonicalUrl: "https://fixture.example.test/news/controlled-story",
+          publishedAt: "2026-09-02T06:00:00.000Z",
+        },
       },
-    ],
-    [
       {
-        id: "offer_controlled",
-        advertiserName: "Harborline Savings",
-        offerName: "High-yield savings account review",
-        trackingUrl: "https://offers-fixture.test/track/harborline-savings",
+        kind: "sponsored",
+        offer: {
+          id: "offer_controlled",
+          advertiserName: "Harborline Savings",
+          offerName: "High-yield savings account review",
+          trackingUrl: "https://offers-fixture.test/track/harborline-savings",
+        },
       },
     ],
     [
@@ -183,14 +207,17 @@ test("assembly input stays provider-neutral", () => {
     ],
   );
 
-  assert.deepEqual(input.stories[0], {
-    title: "Controlled story",
-    summary: "Controlled summary.",
-    body: undefined,
-    url: "https://wordpress-fixture.test/posts/mock_wp_controlled",
+  assert.deepEqual(input.blocks[0], {
+    kind: "story",
+    story: {
+      title: "Controlled story",
+      summary: "Controlled summary.",
+      body: undefined,
+      url: "https://wordpress-fixture.test/posts/mock_wp_controlled",
+    },
   });
-  assert.equal("id" in input.offers[0]!, false);
-  assert.equal("provider" in input.stories[0]!, false);
+  assert.equal("id" in (input.blocks[1] && input.blocks[1].kind === "sponsored" ? input.blocks[1].offer : {}), false);
+  assert.equal("provider" in (input.blocks[0] && input.blocks[0].kind === "story" ? input.blocks[0].story : {}), false);
 });
 
 const controlledStory = {
@@ -225,11 +252,14 @@ test("real published and mock published resolve to the real WordPress.com URL", 
   try {
     const mockFirst = resolveNewsletterStoryUrl(controlledStory, [mockPublished, realPublished]);
     const realFirst = resolveNewsletterStoryUrl(controlledStory, [realPublished, mockPublished]);
-    const assembled = buildNewsletterAssemblyInput([controlledStory], [], [mockPublished, realPublished]);
+    const assembled = buildNewsletterAssemblyInput(
+      [{ kind: "story", story: controlledStory }],
+      [mockPublished, realPublished],
+    );
 
     assert.equal(mockFirst, realPublished.url);
     assert.equal(realFirst, realPublished.url);
-    assert.equal(assembled.stories[0]?.url, realPublished.url);
+    assert.equal(assembled.blocks[0]?.kind === "story" ? assembled.blocks[0].story.url : undefined, realPublished.url);
   } finally {
     restoreFetch();
   }
@@ -285,13 +315,11 @@ test("equivalent resolved inputs still render identically", () => {
   const restoreFetch = installNetworkGuard();
   try {
     const fromMockFirst = buildNewsletterAssemblyInput(
-      [controlledStory],
-      [],
+      [{ kind: "story", story: controlledStory }],
       [mockPublished, realPublished],
     );
     const fromRealFirst = buildNewsletterAssemblyInput(
-      [controlledStory],
-      [],
+      [{ kind: "story", story: controlledStory }],
       [realPublished, mockPublished],
     );
 
@@ -310,8 +338,8 @@ test("newsletter generation allows zero selected offers", async () => {
     const state = await service.load();
 
     assert.equal(state.generatedNewsletterIsCurrent, true);
-    assert.doesNotMatch(state.generatedNewsletter?.html ?? "", /Sponsored links/);
-    assert.doesNotMatch(state.generatedNewsletter?.plainText ?? "", /Sponsored links/);
+    assert.doesNotMatch(state.generatedNewsletter?.html ?? "", /Sponsored/);
+    assert.doesNotMatch(state.generatedNewsletter?.plainText ?? "", /Sponsored/);
   });
 });
 
@@ -345,7 +373,7 @@ test("generated newsletter persists and is marked stale after selection changes"
     assert.match(generated.generatedNewsletter.html, /Aurora Grid Reports Higher Storage Orders/);
     assert.match(generated.generatedNewsletter.html, /Harborline Savings/);
     assert.match(generated.generatedNewsletter.html, /Northstar Brokerage/);
-    assert.match(generated.generatedNewsletter.plainText, /Sponsored links/);
+    assert.match(generated.generatedNewsletter.plainText, /Sponsored/);
     assert.equal(afterOfferChange.generatedNewsletterIsCurrent, false);
     assert.deepEqual(afterOfferChange.generatedNewsletter, generated.generatedNewsletter);
     assert.equal(afterStoryChange.generatedNewsletterIsCurrent, false);

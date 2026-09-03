@@ -3,8 +3,7 @@ import { and, asc, eq } from "drizzle-orm";
 import type { ContentDatabase } from "@/src/db/database";
 import {
   approvedNewsletters,
-  draftOffers,
-  draftStories,
+  draftBlocks,
   drafts,
   publications,
   publishingResults,
@@ -12,6 +11,13 @@ import {
   stories,
 } from "@/src/db/schema";
 import type { ApprovedNewsletterSnapshot } from "@/src/domain/approval";
+import {
+  layoutBlockKey,
+  parseBlockKey,
+  SPONSORED_BLOCK_KIND,
+  STORY_BLOCK_KIND,
+  type StoredLayoutBlock,
+} from "@/src/domain/layout";
 import type { GeneratedNewsletter } from "@/src/domain/newsletter";
 import type { Publication } from "@/src/domain/workbench";
 import type { Story } from "@/src/domain/story";
@@ -22,7 +28,7 @@ const ACTIVE_DRAFT_ID = "draft_active_poc";
 
 export class WorkbenchRepositoryError extends Error {
   constructor(
-    readonly code: "UNKNOWN_PUBLICATION" | "UNKNOWN_STORY",
+    readonly code: "UNKNOWN_PUBLICATION" | "UNKNOWN_STORY" | "INVALID_LAYOUT",
     message: string,
   ) {
     super(message);
@@ -33,8 +39,7 @@ export class WorkbenchRepositoryError extends Error {
 export type StoredDraft = {
   id: string;
   publicationId?: string;
-  selectedStories: Story[];
-  selectedOfferIds: string[];
+  layout: StoredLayoutBlock[];
 };
 
 function asStory(row: typeof stories.$inferSelect): Story {
@@ -131,6 +136,22 @@ function asPublishingResult(row: typeof publishingResults.$inferSelect): Publish
   throw new Error("A stored publishing result has an invalid status.");
 }
 
+function asStoredLayoutBlock(row: typeof draftBlocks.$inferSelect): StoredLayoutBlock {
+  if (row.kind === STORY_BLOCK_KIND && row.storyId) {
+    return { kind: "story", storyId: row.storyId };
+  }
+  if (row.kind === SPONSORED_BLOCK_KIND && row.offerId) {
+    return { kind: "sponsored", offerId: row.offerId };
+  }
+  throw new Error("A stored newsletter layout block is incomplete.");
+}
+
+function storyIdsInLayout(layout: readonly StoredLayoutBlock[]): string[] {
+  return layout
+    .filter((block): block is { kind: "story"; storyId: string } => block.kind === "story")
+    .map((block) => block.storyId);
+}
+
 export class WorkbenchRepository {
   constructor(private readonly db: ContentDatabase) {}
 
@@ -165,29 +186,24 @@ export class WorkbenchRepository {
       throw new Error("The active draft could not be created.");
     }
 
-    const selectedStories = this.db
-      .select({ story: stories })
-      .from(draftStories)
-      .innerJoin(stories, eq(draftStories.storyId, stories.id))
-      .where(eq(draftStories.draftId, ACTIVE_DRAFT_ID))
-      .orderBy(asc(draftStories.position), asc(stories.id))
+    const layout = this.db
+      .select()
+      .from(draftBlocks)
+      .where(eq(draftBlocks.draftId, ACTIVE_DRAFT_ID))
+      .orderBy(asc(draftBlocks.position), asc(draftBlocks.blockKey))
       .all()
-      .map(({ story }) => asStory(story));
-
-    const selectedOfferIds = this.db
-      .select({ offerId: draftOffers.offerId })
-      .from(draftOffers)
-      .where(eq(draftOffers.draftId, ACTIVE_DRAFT_ID))
-      .orderBy(asc(draftOffers.position), asc(draftOffers.offerId))
-      .all()
-      .map((row) => row.offerId);
+      .map(asStoredLayoutBlock);
 
     return {
       id: draft.id,
       publicationId: draft.publicationId ?? undefined,
-      selectedStories,
-      selectedOfferIds,
+      layout,
     };
+  }
+
+  readStory(storyId: string): Story | undefined {
+    const row = this.db.select().from(stories).where(eq(stories.id, storyId)).get();
+    return row ? asStory(row) : undefined;
   }
 
   readGeneratedNewsletter(): GeneratedNewsletter | null {
@@ -329,98 +345,100 @@ export class WorkbenchRepository {
       .run();
   }
 
+  appendBlocks(blocks: readonly StoredLayoutBlock[]): void {
+    const draft = this.readActiveDraft();
+    const existingKeys = new Set(draft.layout.map(layoutBlockKey));
+    const nextLayout = [...draft.layout];
+    let changed = false;
+
+    for (const block of blocks) {
+      const key = layoutBlockKey(block);
+      if (existingKeys.has(key)) {
+        continue;
+      }
+      if (block.kind === "story" && !this.readStory(block.storyId)) {
+        throw new WorkbenchRepositoryError("UNKNOWN_STORY", "The selected story does not exist.");
+      }
+      existingKeys.add(key);
+      nextLayout.push(block);
+      changed = true;
+    }
+
+    if (changed) {
+      this.replaceLayout(nextLayout);
+    }
+  }
+
   addStory(storyId: string): void {
-    const story = this.db.select().from(stories).where(eq(stories.id, storyId)).get();
-    if (!story) {
-      throw new WorkbenchRepositoryError("UNKNOWN_STORY", "The selected story does not exist.");
-    }
-
-    const draft = this.readActiveDraft();
-    if (draft.selectedStories.some((selectedStory) => selectedStory.id === storyId)) {
-      return;
-    }
-
-    this.db.transaction((transaction) => {
-      transaction
-        .insert(draftStories)
-        .values({
-          draftId: ACTIVE_DRAFT_ID,
-          storyId,
-          position: draft.selectedStories.length,
-        })
-        .run();
-      transaction
-        .update(drafts)
-        .set({ updatedAt: new Date().toISOString() })
-        .where(eq(drafts.id, ACTIVE_DRAFT_ID))
-        .run();
-    });
-  }
-
-  removeStory(storyId: string): void {
-    const draft = this.readActiveDraft();
-    const remainingStoryIds = draft.selectedStories
-      .filter((story) => story.id !== storyId)
-      .map((story) => story.id);
-
-    if (remainingStoryIds.length === draft.selectedStories.length) {
-      return;
-    }
-
-    this.replaceDraftStories(remainingStoryIds);
-  }
-
-  moveStory(storyId: string, direction: "up" | "down"): void {
-    const draft = this.readActiveDraft();
-    const storyIds = draft.selectedStories.map((story) => story.id);
-    const currentIndex = storyIds.indexOf(storyId);
-    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
-
-    if (currentIndex === -1 || targetIndex < 0 || targetIndex >= storyIds.length) {
-      return;
-    }
-
-    const targetStoryId = storyIds[targetIndex];
-    if (!targetStoryId) {
-      return;
-    }
-    storyIds[currentIndex] = targetStoryId;
-    storyIds[targetIndex] = storyId;
-    this.replaceDraftStories(storyIds);
+    this.appendBlocks([{ kind: "story", storyId }]);
   }
 
   addOffer(offerId: string): void {
+    this.appendBlocks([{ kind: "sponsored", offerId }]);
+  }
+
+  removeBlock(blockKey: string): void {
     const draft = this.readActiveDraft();
-    if (draft.selectedOfferIds.includes(offerId)) {
+    const remaining = draft.layout.filter((block) => layoutBlockKey(block) !== blockKey);
+    if (remaining.length === draft.layout.length) {
       return;
     }
+    this.replaceLayout(remaining);
+  }
 
-    this.db.transaction((transaction) => {
-      transaction
-        .insert(draftOffers)
-        .values({
-          draftId: ACTIVE_DRAFT_ID,
-          offerId,
-          position: draft.selectedOfferIds.length,
-        })
-        .run();
-      transaction
-        .update(drafts)
-        .set({ updatedAt: new Date().toISOString() })
-        .where(eq(drafts.id, ACTIVE_DRAFT_ID))
-        .run();
-    });
+  removeStory(storyId: string): void {
+    this.removeBlock(layoutBlockKey({ kind: "story", storyId }));
   }
 
   removeOffer(offerId: string): void {
-    const draft = this.readActiveDraft();
-    const remainingOfferIds = draft.selectedOfferIds.filter((selectedOfferId) => selectedOfferId !== offerId);
+    this.removeBlock(layoutBlockKey({ kind: "sponsored", offerId }));
+  }
 
-    if (remainingOfferIds.length === draft.selectedOfferIds.length) {
+  moveBlock(blockKey: string, direction: "up" | "down"): void {
+    const draft = this.readActiveDraft();
+    const keys = draft.layout.map(layoutBlockKey);
+    const currentIndex = keys.indexOf(blockKey);
+    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+
+    if (currentIndex === -1 || targetIndex < 0 || targetIndex >= keys.length) {
       return;
     }
 
-    this.replaceDraftOffers(remainingOfferIds);
+    const nextKeys = [...keys];
+    const current = nextKeys[currentIndex];
+    const target = nextKeys[targetIndex];
+    if (!current || !target) {
+      return;
+    }
+    nextKeys[currentIndex] = target;
+    nextKeys[targetIndex] = current;
+    this.reorderLayout(nextKeys);
+  }
+
+  moveStory(storyId: string, direction: "up" | "down"): void {
+    this.moveBlock(layoutBlockKey({ kind: "story", storyId }), direction);
+  }
+
+  reorderLayout(blockKeys: readonly string[]): void {
+    const draft = this.readActiveDraft();
+    const currentKeys = draft.layout.map(layoutBlockKey);
+    if (blockKeys.length !== currentKeys.length) {
+      throw new WorkbenchRepositoryError(
+        "INVALID_LAYOUT",
+        "The newsletter layout order must include every current block exactly once.",
+      );
+    }
+
+    const currentSet = new Set(currentKeys);
+    const nextSet = new Set(blockKeys);
+    if (currentSet.size !== nextSet.size || currentKeys.some((key) => !nextSet.has(key))) {
+      throw new WorkbenchRepositoryError(
+        "INVALID_LAYOUT",
+        "The newsletter layout order must include every current block exactly once.",
+      );
+    }
+
+    this.replaceLayout(blockKeys.map((blockKey) => parseBlockKey(blockKey)));
   }
 
   savePublishingResult(draft: StoredDraft, result: PublishingResult): void {
@@ -522,30 +540,26 @@ export class WorkbenchRepository {
       ]);
     }
 
-    return draft.selectedStories.flatMap((story) =>
-      [...(resultsByStoryId.get(story.id) ?? [])].sort(comparePublishingResults),
+    return storyIdsInLayout(draft.layout).flatMap((storyId) =>
+      [...(resultsByStoryId.get(storyId) ?? [])].sort(comparePublishingResults),
     );
   }
 
-  private replaceDraftStories(storyIds: string[]): void {
+  private replaceLayout(layout: readonly StoredLayoutBlock[]): void {
     this.db.transaction((transaction) => {
-      transaction.delete(draftStories).where(eq(draftStories.draftId, ACTIVE_DRAFT_ID)).run();
-      for (const [position, storyId] of storyIds.entries()) {
-        transaction.insert(draftStories).values({ draftId: ACTIVE_DRAFT_ID, storyId, position }).run();
-      }
-      transaction
-        .update(drafts)
-        .set({ updatedAt: new Date().toISOString() })
-        .where(eq(drafts.id, ACTIVE_DRAFT_ID))
-        .run();
-    });
-  }
-
-  private replaceDraftOffers(offerIds: string[]): void {
-    this.db.transaction((transaction) => {
-      transaction.delete(draftOffers).where(eq(draftOffers.draftId, ACTIVE_DRAFT_ID)).run();
-      for (const [position, offerId] of offerIds.entries()) {
-        transaction.insert(draftOffers).values({ draftId: ACTIVE_DRAFT_ID, offerId, position }).run();
+      transaction.delete(draftBlocks).where(eq(draftBlocks.draftId, ACTIVE_DRAFT_ID)).run();
+      for (const [position, block] of layout.entries()) {
+        transaction
+          .insert(draftBlocks)
+          .values({
+            draftId: ACTIVE_DRAFT_ID,
+            blockKey: layoutBlockKey(block),
+            position,
+            kind: block.kind,
+            storyId: block.kind === "story" ? block.storyId : null,
+            offerId: block.kind === "sponsored" ? block.offerId : null,
+          })
+          .run();
       }
       transaction
         .update(drafts)

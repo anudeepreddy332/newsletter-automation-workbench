@@ -50,29 +50,34 @@ export class ContentRepository {
   }
 
   listStories(contentFeedId: string): Story[] {
-    return this.db
-      .select({
-        id: stories.id,
-        contentFeedId: stories.contentFeedId,
-        title: stories.title,
-        summary: stories.summary,
-        body: stories.body,
-        canonicalUrl: stories.canonicalUrl,
-        imageUrl: stories.imageUrl,
-        publishedAt: stories.publishedAt,
-        sourceAuthor: stories.sourceAuthor,
-        sourceItemId: stories.sourceItemId,
-      })
-      .from(stories)
-      .where(eq(stories.contentFeedId, contentFeedId))
-      .orderBy(asc(stories.id))
-      .all()
-      .map((story) => ({
-        ...story,
-        body: story.body ?? undefined,
-        imageUrl: story.imageUrl ?? undefined,
-        sourceAuthor: story.sourceAuthor ?? undefined,
-        sourceItemId: story.sourceItemId ?? undefined,
-      }));
+    return this.mapStories(
+      this.db
+        .select()
+        .from(stories)
+        .where(eq(stories.contentFeedId, contentFeedId))
+        .orderBy(asc(stories.id))
+        .all(),
+    );
+  }
+
+  listAllStories(): Story[] {
+    return this.mapStories(
+      this.db.select().from(stories).orderBy(asc(stories.id)).all(),
+    );
+  }
+
+  private mapStories(rows: Array<typeof stories.$inferSelect>): Story[] {
+    return rows.map((story) => ({
+      id: story.id,
+      contentFeedId: story.contentFeedId,
+      title: story.title,
+      summary: story.summary,
+      body: story.body ?? undefined,
+      canonicalUrl: story.canonicalUrl,
+      imageUrl: story.imageUrl ?? undefined,
+      publishedAt: story.publishedAt,
+      sourceAuthor: story.sourceAuthor ?? undefined,
+      sourceItemId: story.sourceItemId ?? undefined,
+    }));
   }
 }

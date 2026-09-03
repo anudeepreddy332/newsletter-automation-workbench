@@ -1,10 +1,10 @@
-import { publishSelectedStories, removeOffer, removeStory } from "@/app/actions";
+import { fetchLatestStories, publishSelectedStories } from "@/app/actions";
 import { GeneratedNewsletterPanel } from "@/app/generated-newsletter";
+import { LayoutWorkspace } from "@/app/layout-workspace";
 import { OfferPicker } from "@/app/offer-picker";
 import { ReviewApprovePanel } from "@/app/review-approve";
 import { StageIterablePanel } from "@/app/stage-iterable";
 import { StoryPicker } from "@/app/story-picker";
-import { formatStoryTimestamp } from "@/app/story-presentation";
 import type { WorkbenchState } from "@/src/domain/workbench";
 import type { PublishingResult } from "@/src/publishing/content-publisher";
 
@@ -88,8 +88,8 @@ export function Workbench({ state }: WorkbenchProps) {
   const selectedStoryIds = state.draft.selectedStories.map((story) => story.id);
   const selectedOfferIds = state.draft.selectedOffers.map((offer) => offer.id);
   const selectedCount = state.draft.selectedStories.length;
-  const selectedOfferCount = state.draft.selectedOffers.length;
-  const canPrepare = selectedCount > 0;
+  const availableCount = state.availableStories.length;
+  const canGenerate = selectedCount > 0;
   const canPublishReal = state.realWordPressConfigured && selectedCount === 1;
   const mockPublishedCount = state.publishingResults.filter(
     (result) => result.mode === "mock" && result.status === "published",
@@ -110,8 +110,8 @@ export function Workbench({ state }: WorkbenchProps) {
         <div className="header-copy">
           <h1>Newsletter Builder</h1>
           <p className="header-description">
-            Choose stories and advertiser links, generate a newsletter, then review, approve, and
-            stage it.
+            Fetch stories, choose stories and advertiser links, arrange the newsletter, generate a
+            preview, then review, approve, and stage it.
           </p>
         </div>
         <div className="saved-indicator">
@@ -122,11 +122,33 @@ export function Workbench({ state }: WorkbenchProps) {
 
       <div className="workbench-surface">
         <div className="workflow-stack">
+          <section className="workflow-panel fetch-panel" aria-labelledby="fetch-stories-heading">
+            <div className="panel-heading">
+              <div>
+                <h2 id="fetch-stories-heading">1. Fetch stories</h2>
+                <p>
+                  Read the local sample story fixture into this workbench. This is not a live feed
+                  and does not schedule updates.
+                </p>
+              </div>
+            </div>
+            <form action={fetchLatestStories}>
+              <button className="button button-primary prepare-button" type="submit">
+                Fetch latest stories
+              </button>
+            </form>
+            <p className="preparation-hint">
+              {availableCount === 0
+                ? "No stories are available yet. Fetch latest stories to load the local sample fixture."
+                : `${availableCount} ${availableCount === 1 ? "story is" : "stories are"} available. Fetch again to refresh the source without removing existing stories.`}
+            </p>
+          </section>
+
           <section className="workflow-panel story-selection-panel" aria-labelledby="story-picker-heading">
             <div className="panel-heading">
               <div>
-                <h2 id="story-picker-heading">1. Choose stories</h2>
-                <p>Select a story to inspect, read, and add to the newsletter.</p>
+                <h2 id="story-picker-heading">2. Choose stories</h2>
+                <p>Select one or more available stories and add them to the newsletter.</p>
               </div>
             </div>
             <StoryPicker
@@ -135,55 +157,10 @@ export function Workbench({ state }: WorkbenchProps) {
             />
           </section>
 
-          <section className="workflow-panel selected-panel" aria-labelledby="selected-stories-heading">
-            <div className="panel-heading panel-heading-with-count">
-              <div>
-                <h2 id="selected-stories-heading">Stories added</h2>
-                <p>These are the stories you have added to this newsletter.</p>
-              </div>
-              <span
-                className="story-count"
-                aria-label={`${selectedCount} ${selectedCount === 1 ? "story" : "stories"} added`}
-              >
-                {selectedCount}
-              </span>
-            </div>
-
-            {selectedCount === 0 ? (
-              <div className="empty-state">
-                <div className="empty-state-icon" aria-hidden="true">+</div>
-                <h3>No stories added yet</h3>
-                <p>Choose a story above and add it to the newsletter.</p>
-              </div>
-            ) : (
-              <ol className="selected-story-list">
-                {state.draft.selectedStories.map((story, index) => (
-                  <li key={story.id} className="selected-story-item">
-                    <span className="story-position" aria-hidden="true">{index + 1}</span>
-                    <div className="selected-story-copy">
-                      <h3>{story.title}</h3>
-                      <p>{formatStoryTimestamp(story.publishedAt)}</p>
-                    </div>
-                    <form className="selected-story-actions" action={removeStory}>
-                      <input type="hidden" name="storyId" value={story.id} />
-                      <button
-                        className="small-button remove-button"
-                        type="submit"
-                        aria-label={`Remove ${story.title} from newsletter`}
-                      >
-                        Remove
-                      </button>
-                    </form>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </section>
-
           <section className="workflow-panel offer-selection-panel" aria-labelledby="offer-picker-heading">
             <div className="panel-heading">
               <div>
-                <h2 id="offer-picker-heading">2. Choose advertiser links</h2>
+                <h2 id="offer-picker-heading">3. Choose advertiser links</h2>
                 <p>Select one or more sample advertiser offers to include with this newsletter.</p>
               </div>
             </div>
@@ -194,52 +171,25 @@ export function Workbench({ state }: WorkbenchProps) {
             />
           </section>
 
-          <section className="workflow-panel selected-panel selected-offers-panel" aria-labelledby="selected-offers-heading">
-            <div className="panel-heading panel-heading-with-count">
+          <section
+            id="arrange-newsletter"
+            className="workflow-panel selected-panel arrange-panel"
+            aria-labelledby="arrange-heading"
+          >
+            <div className="panel-heading">
               <div>
-                <h2 id="selected-offers-heading">Advertiser links added</h2>
-                <p>These advertiser offers will appear in a separate sponsored-links section.</p>
+                <h2 id="arrange-heading">4. Arrange newsletter</h2>
+                <p>
+                  Drag any block above or below any other block. This order is the exact newsletter
+                  render order.
+                </p>
               </div>
-              <span
-                className="story-count"
-                aria-label={`${selectedOfferCount} ${selectedOfferCount === 1 ? "advertiser link" : "advertiser links"} added`}
-              >
-                {selectedOfferCount}
-              </span>
             </div>
-
-            {selectedOfferCount === 0 ? (
-              <div className="empty-state">
-                <div className="empty-state-icon" aria-hidden="true">+</div>
-                <h3>No advertiser links added yet</h3>
-                <p>You can generate a newsletter without advertiser links, or add some above.</p>
-              </div>
-            ) : (
-              <ul className="selected-story-list">
-                {state.draft.selectedOffers.map((offer) => (
-                  <li key={offer.id} className="selected-story-item selected-offer-item">
-                    <div className="selected-story-copy">
-                      <h3>{offer.advertiserName} — {offer.offerName}</h3>
-                      <p><code>{offer.trackingUrl}</code></p>
-                    </div>
-                    <form className="selected-story-actions" action={removeOffer}>
-                      <input type="hidden" name="offerId" value={offer.id} />
-                      <button
-                        className="small-button remove-button"
-                        type="submit"
-                        aria-label={`Remove ${offer.advertiserName} ${offer.offerName} from newsletter`}
-                      >
-                        Remove
-                      </button>
-                    </form>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <LayoutWorkspace blocks={state.draft.layout} />
           </section>
 
           <GeneratedNewsletterPanel
-            canGenerate={canPrepare}
+            canGenerate={canGenerate}
             generatedNewsletter={state.generatedNewsletter}
             generatedNewsletterIsCurrent={state.generatedNewsletterIsCurrent}
           />
@@ -261,13 +211,16 @@ export function Workbench({ state }: WorkbenchProps) {
             stagingReceipt={state.stagingReceipt}
           />
 
-          <section className="workflow-panel preparation-panel" aria-labelledby="preparation-heading">
-            <div className="panel-heading">
-              <div>
-                <h2 id="preparation-heading">WordPress test evidence</h2>
-                <p>Prepare local mock results, or optionally publish one story to a disposable WordPress.com test site.</p>
-              </div>
-            </div>
+          <details className="workflow-panel wordpress-evidence">
+            <summary>
+              <span className="wordpress-evidence-title">WordPress test evidence</span>
+              <span className="wordpress-evidence-copy">Optional publishing test details</span>
+            </summary>
+
+            <p className="preparation-hint wordpress-evidence-note">
+              WordPress resolves or publishes story pages only. It does not publish the finished
+              newsletter.
+            </p>
 
             <div className="publishing-mode">
               <div>
@@ -279,14 +232,14 @@ export function Workbench({ state }: WorkbenchProps) {
 
             <form action={publishSelectedStories}>
               <input type="hidden" name="mode" value="mock" />
-              <button className="button button-primary prepare-button" type="submit" disabled={!canPrepare}>
+              <button className="button button-quiet prepare-button" type="submit" disabled={!canGenerate}>
                 Prepare selected stories
               </button>
             </form>
             <p className="preparation-hint">
-              {canPrepare
-                ? "Creates test results only. Nothing is published externally."
-                : "Add at least one story to continue."}
+              {canGenerate
+                ? "Optional. Generate newsletter already creates mock story-page results when needed. Nothing is published externally."
+                : "Add at least one story to inspect mock WordPress results."}
             </p>
 
             <div className={`publishing-mode real-mode${state.realWordPressConfigured ? "" : " is-disabled"}`}>
@@ -363,7 +316,7 @@ export function Workbench({ state }: WorkbenchProps) {
                 </ul>
               </div>
             ) : null}
-          </section>
+          </details>
         </div>
       </div>
 

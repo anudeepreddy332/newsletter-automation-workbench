@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { addOffer } from "@/app/actions";
+import { addSelectedOffers } from "@/app/actions";
 import type { Offer } from "@/src/domain/offer";
 
 type OfferPickerProps = {
@@ -11,59 +11,113 @@ type OfferPickerProps = {
 };
 
 export function OfferPicker({ offers, selectedOfferIds }: OfferPickerProps) {
-  const [offerId, setOfferId] = useState("");
-  const selectedOffer = offers.find((offer) => offer.id === offerId);
-  const isAlreadySelected = selectedOffer ? selectedOfferIds.includes(selectedOffer.id) : false;
+  const [isOpen, setIsOpen] = useState(false);
+  const [pendingOfferIds, setPendingOfferIds] = useState<string[]>([]);
+  const [inspectingOfferId, setInspectingOfferId] = useState<string | null>(null);
+  const selectedCount = selectedOfferIds.length;
+  const pendingCount = pendingOfferIds.filter((offerId) => !selectedOfferIds.includes(offerId)).length;
+  const inspectingOffer = offers.find((offer) => offer.id === inspectingOfferId);
+  const panelId = "offer-picker-panel";
+
+  function togglePending(offerId: string, alreadySelected: boolean) {
+    if (alreadySelected) {
+      return;
+    }
+    setPendingOfferIds((current) =>
+      current.includes(offerId)
+        ? current.filter((id) => id !== offerId)
+        : [...current, offerId],
+    );
+  }
 
   return (
-    <div className="offer-picker">
-      <div className="field-group">
-        <label htmlFor="offer-picker">Advertiser / offer</label>
-        <select
-          id="offer-picker"
-          value={offerId}
-          onChange={(event) => setOfferId(event.target.value)}
-        >
-          <option value="">Select an advertiser offer</option>
-          {offers.map((offer) => (
-            <option key={offer.id} value={offer.id}>
-              {offer.advertiserName} — {offer.offerName}
-            </option>
-          ))}
-        </select>
-        <p className="field-help">{offers.length} sample advertiser offers available</p>
-      </div>
+    <div className="choice-picker">
+      <button
+        className="button button-quiet picker-toggle"
+        type="button"
+        aria-expanded={isOpen}
+        aria-controls={panelId}
+        onClick={() => setIsOpen((open) => !open)}
+      >
+        Choose advertiser links
+      </button>
+      <p className="picker-summary">
+        {selectedCount} {selectedCount === 1 ? "advertiser link" : "advertiser links"} in the newsletter
+      </p>
+      <p className="field-help">{offers.length} sample advertiser offers available</p>
 
-      {!selectedOffer ? (
-        <div className="story-picker-placeholder">
-          <p>Select an advertiser offer to inspect it before adding the tracking link.</p>
-        </div>
-      ) : (
-        <article className="story-detail-card offer-detail-card">
-          <span className="story-detail-label">Selected offer information</span>
-          <h3>{selectedOffer.offerName}</h3>
-          <dl className="offer-metadata">
-            <div>
-              <dt>Advertiser</dt>
-              <dd>{selectedOffer.advertiserName}</dd>
-            </div>
-            <div>
-              <dt>Offer</dt>
-              <dd>{selectedOffer.offerName}</dd>
-            </div>
-            <div>
-              <dt>Sample tracking URL</dt>
-              <dd><code>{selectedOffer.trackingUrl}</code></dd>
-            </div>
-          </dl>
-          <form action={addOffer}>
-            <input type="hidden" name="offerId" value={selectedOffer.id} />
-            <button className="button button-primary" type="submit" disabled={isAlreadySelected}>
-              {isAlreadySelected ? "Already added" : "Add advertiser link"}
+      {isOpen ? (
+        <div id={panelId} className="picker-panel">
+          <form
+            action={async (formData) => {
+              await addSelectedOffers(formData);
+              setPendingOfferIds([]);
+              setInspectingOfferId(null);
+              setIsOpen(false);
+            }}
+          >
+            <ul className="picker-row-list">
+              {offers.map((offer) => {
+                const alreadySelected = selectedOfferIds.includes(offer.id);
+                const checked = alreadySelected || pendingOfferIds.includes(offer.id);
+                return (
+                  <li key={offer.id} className="picker-row">
+                    <label className={`picker-choice${alreadySelected ? " is-disabled" : ""}`}>
+                      <input
+                        type="checkbox"
+                        name="offerId"
+                        value={offer.id}
+                        checked={checked}
+                        disabled={alreadySelected}
+                        onChange={() => togglePending(offer.id, alreadySelected)}
+                      />
+                      <span>{offer.advertiserName} — {offer.offerName}</span>
+                    </label>
+                    <button
+                      className="small-button"
+                      type="button"
+                      onClick={() =>
+                        setInspectingOfferId((current) => (current === offer.id ? null : offer.id))
+                      }
+                      aria-expanded={inspectingOfferId === offer.id}
+                    >
+                      View
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            <button
+              className="button button-primary prepare-button"
+              type="submit"
+              disabled={pendingCount === 0}
+            >
+              Add selected links ({pendingCount})
             </button>
           </form>
-        </article>
-      )}
+
+          {inspectingOffer ? (
+            <article className="story-detail-card offer-detail-card">
+              <span className="story-detail-label">Selected offer information</span>
+              <h3>{inspectingOffer.offerName}</h3>
+              <dl className="offer-metadata">
+                <div>
+                  <dt>Advertiser</dt>
+                  <dd>{inspectingOffer.advertiserName}</dd>
+                </div>
+                <div>
+                  <dt>Offer</dt>
+                  <dd>{inspectingOffer.offerName}</dd>
+                </div>
+                <div>
+                  <dt>Sample tracking URL</dt>
+                  <dd><code>{inspectingOffer.trackingUrl}</code></dd>
+                </div>
+              </dl>
+            </article>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

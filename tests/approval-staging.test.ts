@@ -13,7 +13,7 @@ import { MOCK_ITERABLE_PROVIDER, MockIterable } from "@/src/adapters/staging/moc
 import { openContentDatabase } from "@/src/db/database";
 import { applyContentFoundationMigrations } from "@/src/db/migrate";
 import type { ContentDatabase } from "@/src/db/database";
-import { approvedNewsletters, stagingReceipts } from "@/src/db/schema";
+import { approvedNewsletters, publishingResults, stagingReceipts } from "@/src/db/schema";
 import type { ApprovedNewsletterSnapshot } from "@/src/domain/approval";
 import {
   approvedSnapshotFromGenerated,
@@ -85,6 +85,7 @@ async function withWorkbench(
     mockEverflowOfferCatalog,
     stager,
   );
+  await service.fetchLatestStories();
 
   try {
     await run(service, db, stager);
@@ -225,10 +226,23 @@ test("offer change invalidates approval for staging", async () => {
 });
 
 test("publishing URL change invalidates approval for staging", async () => {
-  await withWorkbench(async (service) => {
+  await withWorkbench(async (service, db) => {
     await generateCurrentNewsletter(service);
     await service.approveNewsletter();
-    await service.publishSelectedStories("mock");
+    const draft = (await service.load()).draft;
+    db.insert(publishingResults)
+      .values({
+        draftId: draft.id,
+        publicationId: draft.publicationId!,
+        storyId: firstStoryId,
+        provider: "WordPress.com",
+        mode: "real",
+        status: "published",
+        externalPostId: "88421",
+        url: "https://example.wordpress.com/2026/09/02/controlled-story/",
+        diagnostic: null,
+      })
+      .run();
     const state = await service.load();
 
     assert.equal(state.generatedNewsletterIsCurrent, false);
