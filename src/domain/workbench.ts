@@ -3,6 +3,7 @@ import type { GeneratedNewsletter } from "@/src/domain/newsletter";
 import type { Offer } from "@/src/domain/offer";
 import type { Story } from "@/src/domain/story";
 import type { PublishingResult } from "@/src/publishing/content-publisher";
+import type { NewsletterPublication } from "@/src/publishing/newsletter-publisher";
 import type { StagingResult } from "@/src/staging/newsletter-stager";
 
 export type Publication = {
@@ -47,5 +48,8 @@ export type WorkbenchState = {
   generatedNewsletterIsCurrent: boolean;
   approvedNewsletter: ApprovedNewsletterSnapshot | null;
   approvalIsCurrent: boolean;
+  wordpressConfigured: boolean;
+  newsletterPublication: NewsletterPublication | null;
+  newsletterPublicationIsCurrent: boolean;
   stagingReceipt: StagingResult | null;
 };

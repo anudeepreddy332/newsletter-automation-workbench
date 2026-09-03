@@ -5,6 +5,7 @@ import {
   approvedNewsletters,
   draftBlocks,
   drafts,
+  newsletterPublications,
   publications,
   publishingResults,
   stagingReceipts,
@@ -22,6 +23,11 @@ import type { GeneratedNewsletter } from "@/src/domain/newsletter";
 import type { Publication } from "@/src/domain/workbench";
 import type { Story } from "@/src/domain/story";
 import type { PublishingMode, PublishingResult } from "@/src/publishing/content-publisher";
+import type {
+  NewsletterPublication,
+  NewsletterPublicationResult,
+  NewsletterPublicationStatus,
+} from "@/src/publishing/newsletter-publisher";
 import type { StagingResult } from "@/src/staging/newsletter-stager";
 
 const ACTIVE_DRAFT_ID = "draft_active_poc";
@@ -80,6 +86,35 @@ function asApprovedNewsletter(row: typeof approvedNewsletters.$inferSelect): App
     preheader: row.preheader,
     html: row.html,
     plainText: row.plainText,
+  };
+}
+
+function asNewsletterPublicationStatus(value: string): NewsletterPublicationStatus {
+  if (value === "published" || value === "failed" || value === "unknown") {
+    return value;
+  }
+  throw new Error("A stored newsletter publication has an invalid status.");
+}
+
+function asNewsletterPublication(
+  row: typeof newsletterPublications.$inferSelect,
+): NewsletterPublication {
+  const status = asNewsletterPublicationStatus(row.status);
+  if (status === "published" && (!row.externalPostId || !row.url)) {
+    throw new Error("A stored successful newsletter publication is incomplete.");
+  }
+  if ((status === "failed" || status === "unknown") && !row.diagnostic) {
+    throw new Error("A stored newsletter publication is missing a diagnostic.");
+  }
+
+  return {
+    draftId: row.draftId,
+    provider: row.provider,
+    status,
+    externalPostId: row.externalPostId,
+    url: row.url,
+    approvalFingerprint: row.approvalFingerprint,
+    diagnostic: row.diagnostic,
   };
 }
 
@@ -283,6 +318,50 @@ export class WorkbenchRepository {
         },
       })
       .run();
+  }
+
+  readNewsletterPublication(draftId: string): NewsletterPublication | null {
+    const row = this.db
+      .select()
+      .from(newsletterPublications)
+      .where(eq(newsletterPublications.draftId, draftId))
+      .get();
+
+    return row ? asNewsletterPublication(row) : null;
+  }
+
+  saveNewsletterPublication(
+    draftId: string,
+    result: NewsletterPublicationResult,
+  ): NewsletterPublication {
+    this.readActiveDraft();
+    const values = {
+      draftId,
+      provider: result.provider,
+      status: result.status,
+      externalPostId: result.externalPostId ?? null,
+      url: result.url ?? null,
+      approvalFingerprint: result.approvalFingerprint,
+      diagnostic: result.status === "published" ? null : result.diagnostic,
+    };
+
+    this.db
+      .insert(newsletterPublications)
+      .values(values)
+      .onConflictDoUpdate({
+        target: newsletterPublications.draftId,
+        set: {
+          provider: values.provider,
+          status: values.status,
+          externalPostId: values.externalPostId,
+          url: values.url,
+          approvalFingerprint: values.approvalFingerprint,
+          diagnostic: values.diagnostic,
+        },
+      })
+      .run();
+
+    return this.readNewsletterPublication(draftId)!;
   }
 
   findStagingReceipt(

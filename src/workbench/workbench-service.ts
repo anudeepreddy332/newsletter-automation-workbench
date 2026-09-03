@@ -11,7 +11,7 @@ import type {
   WorkbenchState,
 } from "@/src/domain/workbench";
 import type { OfferCatalog } from "@/src/domain/offer";
-import { buildNewsletterAssemblyInput, hasUsablePublishedUrl } from "@/src/newsletter/assembly";
+import { buildNewsletterAssemblyInput } from "@/src/newsletter/assembly";
 import {
   approvedSnapshotFromGenerated,
   fingerprintNewsletterInput,
@@ -32,6 +32,11 @@ import {
   type StoredDraft,
 } from "@/src/repositories/workbench-repository";
 import type { NewsletterStager, StagingResult } from "@/src/staging/newsletter-stager";
+import type {
+  NewsletterPublication,
+  NewsletterPublisher,
+} from "@/src/publishing/newsletter-publisher";
+import { isPublishedNewsletter } from "@/src/publishing/newsletter-publisher";
 import { INTERNAL_POC_PUBLICATION, POC_PUBLICATIONS } from "@/src/workbench/publications";
 
 type NewsletterContext = {
@@ -41,6 +46,8 @@ type NewsletterContext = {
   generatedNewsletterIsCurrent: boolean;
   approvedNewsletter: WorkbenchState["approvedNewsletter"];
   approvalIsCurrent: boolean;
+  newsletterPublication: NewsletterPublication | null;
+  newsletterPublicationIsCurrent: boolean;
   stagingReceipt: StagingResult | null;
 };
 
@@ -53,6 +60,7 @@ export class WorkbenchService {
     private readonly realPublisher: ContentPublisher | null = null,
     private readonly offerCatalog: OfferCatalog = mockEverflowOfferCatalog,
     private readonly stager: NewsletterStager = new MockIterable(),
+    private readonly newsletterPublisher: NewsletterPublisher | null = null,
   ) {}
 
   async load(): Promise<WorkbenchState> {
@@ -69,6 +77,9 @@ export class WorkbenchService {
       generatedNewsletterIsCurrent: context.generatedNewsletterIsCurrent,
       approvedNewsletter: context.approvedNewsletter,
       approvalIsCurrent: context.approvalIsCurrent,
+      wordpressConfigured: this.newsletterPublisher !== null,
+      newsletterPublication: context.newsletterPublication,
+      newsletterPublicationIsCurrent: context.newsletterPublicationIsCurrent,
       stagingReceipt: context.stagingReceipt,
     };
   }
@@ -184,11 +195,7 @@ export class WorkbenchService {
       );
     }
 
-    await this.resolveMockWordPressForStoryBlocks(storedDraft, draft);
-    const publishingResults = this.workbenchRepository.listPublishingResults(
-      this.workbenchRepository.readActiveDraft(),
-    );
-    const input = buildNewsletterAssemblyInput(draft.layout, publishingResults);
+    const input = buildNewsletterAssemblyInput(draft.layout);
     const rendered = renderNewsletter(input);
     this.workbenchRepository.saveGeneratedNewsletter({
       ...rendered,
@@ -221,6 +228,39 @@ export class WorkbenchService {
     this.workbenchRepository.saveApprovedNewsletter(
       approvedSnapshotFromGenerated(context.draft.id, context.generatedNewsletter),
     );
+  }
+
+  async publishApprovedNewsletter(): Promise<NewsletterPublication> {
+    this.ensureInternalPublication();
+    const context = this.readNewsletterContext();
+    this.assertCurrentApprovedNewsletter(context, "publishing");
+
+    if (!this.newsletterPublisher) {
+      throw new WorkbenchServiceError(
+        "WORDPRESS_NOT_CONFIGURED",
+        "WordPress.com publishing is unavailable because server-side credentials are not configured.",
+      );
+    }
+
+    const approved = context.approvedNewsletter!;
+    const stored = context.newsletterPublication;
+
+    if (
+      isPublishedNewsletter(stored) &&
+      stored.approvalFingerprint === approved.approvalFingerprint
+    ) {
+      return stored;
+    }
+
+    if (stored?.status === "unknown") {
+      return this.reconcileUnknownPublication(approved.draftId, approved.approvalFingerprint, stored);
+    }
+
+    const result = stored?.externalPostId
+      ? await this.newsletterPublisher.update(stored.externalPostId, approved)
+      : await this.newsletterPublisher.publish(approved);
+
+    return this.persistNewsletterPublication(approved.draftId, result, stored);
   }
 
   async stageApprovedNewsletter(): Promise<StagingResult> {
@@ -256,6 +296,24 @@ export class WorkbenchService {
         "The previous approval no longer matches this newsletter. Review and approve again before staging.",
       );
     }
+    if (!context.newsletterPublicationIsCurrent || !isPublishedNewsletter(context.newsletterPublication)) {
+      if (context.newsletterPublication?.status === "unknown") {
+        throw new WorkbenchServiceError(
+          "WORDPRESS_PUBLICATION_UNKNOWN",
+          "The WordPress publication is unconfirmed. Reconcile the existing post before staging.",
+        );
+      }
+      if (context.newsletterPublication && isPublishedNewsletter(context.newsletterPublication)) {
+        throw new WorkbenchServiceError(
+          "WORDPRESS_PUBLICATION_STALE",
+          "The WordPress publication no longer matches this approved newsletter. Publish or update WordPress before staging.",
+        );
+      }
+      throw new WorkbenchServiceError(
+        "WORDPRESS_PUBLICATION_REQUIRED",
+        "Publish the approved newsletter to WordPress before staging.",
+      );
+    }
 
     const existing = this.workbenchRepository.findStagingReceipt(
       context.approvedNewsletter.draftId,
@@ -266,7 +324,12 @@ export class WorkbenchService {
       return existing;
     }
 
-    const result = this.stager.stage(context.approvedNewsletter);
+    const result = this.stager.stage({
+      approvedSnapshot: context.approvedNewsletter,
+      wordpressPostId: context.newsletterPublication.externalPostId,
+      wordpressUrl: context.newsletterPublication.url,
+      wordpressApprovalFingerprint: context.newsletterPublication.approvalFingerprint,
+    });
     return this.workbenchRepository.saveStagingReceipt(context.approvedNewsletter.draftId, result);
   }
 
@@ -315,22 +378,101 @@ export class WorkbenchService {
     return results;
   }
 
-  private async resolveMockWordPressForStoryBlocks(
-    storedDraft: StoredDraft,
-    draft: Draft,
-  ): Promise<void> {
-    let publishingResults = this.workbenchRepository.listPublishingResults(storedDraft);
-    for (const block of draft.layout) {
-      if (block.kind !== "story") {
-        continue;
-      }
-      if (hasUsablePublishedUrl(block.story.id, publishingResults)) {
-        continue;
-      }
+  private async reconcileUnknownPublication(
+    draftId: string,
+    approvalFingerprint: string,
+    stored: NewsletterPublication,
+  ): Promise<NewsletterPublication> {
+    if (!this.newsletterPublisher || !stored.externalPostId) {
+      return stored;
+    }
 
-      const result = await this.publishStory(storedDraft, block.story, "mock");
-      this.workbenchRepository.savePublishingResult(storedDraft, result);
-      publishingResults = this.workbenchRepository.listPublishingResults(storedDraft);
+    const observed = await this.newsletterPublisher.readExisting(stored.externalPostId);
+    if (
+      observed.status === "published" &&
+      stored.approvalFingerprint === approvalFingerprint &&
+      observed.externalPostId
+    ) {
+      return this.persistNewsletterPublication(
+        draftId,
+        {
+          ...observed,
+          approvalFingerprint: stored.approvalFingerprint,
+        },
+        stored,
+      );
+    }
+
+    return this.persistNewsletterPublication(
+      draftId,
+      {
+        status: "unknown",
+        provider: observed.provider,
+        diagnostic:
+          observed.status === "unknown"
+            ? observed.diagnostic
+            : "WordPress.com has a post for this newsletter, but the write outcome is still unconfirmed. No additional write was attempted.",
+        approvalFingerprint: stored.approvalFingerprint,
+        externalPostId: observed.externalPostId ?? stored.externalPostId ?? undefined,
+        url: observed.url ?? stored.url ?? undefined,
+      },
+      stored,
+    );
+  }
+
+  private persistNewsletterPublication(
+    draftId: string,
+    result: Parameters<WorkbenchRepository["saveNewsletterPublication"]>[1],
+    previous: NewsletterPublication | null,
+  ): NewsletterPublication {
+    return this.workbenchRepository.saveNewsletterPublication(draftId, {
+      ...result,
+      ...(previous?.externalPostId && !result.externalPostId
+        ? { externalPostId: previous.externalPostId }
+        : {}),
+      ...(previous?.url && !result.url ? { url: previous.url } : {}),
+    });
+  }
+
+  private assertCurrentApprovedNewsletter(
+    context: NewsletterContext,
+    action: "publishing" | "staging",
+  ): void {
+    if (context.draft.selectedStories.length === 0) {
+      throw new WorkbenchServiceError(
+        "STORIES_REQUIRED",
+        `Add at least one story block before ${action} a newsletter.`,
+      );
+    }
+    if (!context.generatedNewsletter) {
+      throw new WorkbenchServiceError(
+        "NEWSLETTER_REQUIRED",
+        `Generate and approve a newsletter before ${action}.`,
+      );
+    }
+    if (!context.generatedNewsletterIsCurrent) {
+      throw new WorkbenchServiceError(
+        "NEWSLETTER_STALE",
+        `This generated newsletter is out of date. Generate, review, and approve again before ${action}.`,
+      );
+    }
+    if (!context.approvedNewsletter) {
+      throw new WorkbenchServiceError(
+        "APPROVAL_REQUIRED",
+        `Approve the current newsletter before ${action}.`,
+      );
+    }
+    if (!isApprovedSnapshotConsistent(context.approvedNewsletter)) {
+      throw new WorkbenchServiceError(
+        "APPROVAL_MISMATCH",
+        "The stored approval does not match the approved newsletter snapshot.",
+      );
+    }
+    if (!context.approvalIsCurrent) {
+      throw new WorkbenchServiceError(
+        "APPROVAL_STALE",
+        `The previous approval no longer matches this newsletter. Review and approve again before ${action}.`,
+      );
     }
   }
 
@@ -410,9 +552,8 @@ export class WorkbenchService {
   ): NewsletterContext {
     const draft = this.hydrateDraft(storedDraft);
     const generatedNewsletter = this.workbenchRepository.readGeneratedNewsletter();
-    const publishingResults = this.workbenchRepository.listPublishingResults(storedDraft);
     const inputFingerprint = fingerprintNewsletterInput(
-      buildNewsletterAssemblyInput(draft.layout, publishingResults),
+      buildNewsletterAssemblyInput(draft.layout),
     );
     const generatedNewsletterIsCurrent =
       generatedNewsletter !== null && generatedNewsletter.inputFingerprint === inputFingerprint;
@@ -422,8 +563,15 @@ export class WorkbenchService {
       generatedNewsletterIsCurrent,
       approvedNewsletter,
     );
+    const newsletterPublication = this.workbenchRepository.readNewsletterPublication(draft.id);
+    const newsletterPublicationIsCurrent = Boolean(
+      approvalIsCurrent &&
+        approvedNewsletter &&
+        isPublishedNewsletter(newsletterPublication) &&
+        newsletterPublication.approvalFingerprint === approvedNewsletter.approvalFingerprint,
+    );
     const stagingReceipt =
-      approvalIsCurrent && approvedNewsletter
+      approvalIsCurrent && approvedNewsletter && newsletterPublicationIsCurrent
         ? this.workbenchRepository.findStagingReceipt(
             approvedNewsletter.draftId,
             approvedNewsletter.approvalFingerprint,
@@ -438,6 +586,8 @@ export class WorkbenchService {
       generatedNewsletterIsCurrent,
       approvedNewsletter,
       approvalIsCurrent,
+      newsletterPublication,
+      newsletterPublicationIsCurrent,
       stagingReceipt,
     };
   }
@@ -488,7 +638,11 @@ export class WorkbenchServiceError extends Error {
       | "NEWSLETTER_STALE"
       | "APPROVAL_REQUIRED"
       | "APPROVAL_STALE"
-      | "APPROVAL_MISMATCH",
+      | "APPROVAL_MISMATCH"
+      | "WORDPRESS_NOT_CONFIGURED"
+      | "WORDPRESS_PUBLICATION_REQUIRED"
+      | "WORDPRESS_PUBLICATION_STALE"
+      | "WORDPRESS_PUBLICATION_UNKNOWN",
     message: string,
   ) {
     super(message);

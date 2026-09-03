@@ -249,13 +249,14 @@ test("a legacy local draft is reassigned safely while its prior results remain v
   });
 });
 
-test("the operator UI is vertical with fetch, choose, arrange, generate, review, and stage steps", () => {
+test("the operator UI is vertical with fetch, choose, arrange, generate, review, publish, and stage steps", () => {
   const workbenchSource = readFileSync(path.join(process.cwd(), "app/workbench.tsx"), "utf8");
   const storyPickerSource = readFileSync(path.join(process.cwd(), "app/story-picker.tsx"), "utf8");
   const offerPickerSource = readFileSync(path.join(process.cwd(), "app/offer-picker.tsx"), "utf8");
   const layoutSource = readFileSync(path.join(process.cwd(), "app/layout-workspace.tsx"), "utf8");
   const generatedSource = readFileSync(path.join(process.cwd(), "app/generated-newsletter.tsx"), "utf8");
   const reviewSource = readFileSync(path.join(process.cwd(), "app/review-approve.tsx"), "utf8");
+  const publishSource = readFileSync(path.join(process.cwd(), "app/publish-wordpress.tsx"), "utf8");
   const stageSource = readFileSync(path.join(process.cwd(), "app/stage-iterable.tsx"), "utf8");
   const actionsSource = readFileSync(path.join(process.cwd(), "app/actions.ts"), "utf8");
 
@@ -271,11 +272,18 @@ test("the operator UI is vertical with fetch, choose, arrange, generate, review,
   assert.match(generatedSource, /5\. Generate and preview/);
   assert.match(generatedSource, /Edit layout/);
   assert.match(generatedSource, /newsletter-frame/);
+  assert.doesNotMatch(generatedSource, /Mock WordPress|Prepare selected stories/);
   assert.match(reviewSource, /6\. Review and approve/);
   assert.match(reviewSource, /Approve newsletter/);
   assert.match(reviewSource, /Not approved/);
   assert.doesNotMatch(reviewSource, /iframe|srcDoc/);
-  assert.match(stageSource, /7\. Stage to Iterable/);
+  assert.match(publishSource, /7\. Publish to WordPress/);
+  assert.match(publishSource, /Publish approved newsletter/);
+  assert.match(publishSource, /Update published newsletter/);
+  assert.match(publishSource, /View live newsletter/);
+  assert.match(publishSource, /Not published/);
+  assert.doesNotMatch(publishSource, /Prepare selected stories|mock-badge|Mock URL/);
+  assert.match(stageSource, /8\. Stage to Iterable/);
   assert.match(stageSource, /Mock Iterable only/);
   assert.match(stageSource, /does not send email/);
   assert.match(stageSource, /Stage approved newsletter/);
@@ -298,16 +306,15 @@ test("the operator UI is vertical with fetch, choose, arrange, generate, review,
   assert.match(layoutSource, /Remove/);
   assert.match(layoutSource, /Story|Sponsored/);
   assert.doesNotMatch(workbenchSource, /Everflow|afterStoryId|relevance score/);
+  assert.doesNotMatch(workbenchSource, /WordPress test evidence|Prepare selected stories|mock-ready/);
   assert.doesNotMatch(generatedSource, /Iterable|Approve newsletter/);
   assert.match(actionsSource, /fetchLatestStories/);
   assert.match(actionsSource, /approveNewsletter/);
+  assert.match(actionsSource, /publishApprovedNewsletter/);
   assert.match(actionsSource, /stageApprovedNewsletter/);
-  assert.match(workbenchSource, /WordPress test evidence/);
-  assert.match(workbenchSource, /Optional publishing test details/);
-  assert.match(workbenchSource, /<details className="workflow-panel wordpress-evidence">/);
-  assert.match(workbenchSource, /REAL WORDPRESS\.COM TEST SITE/);
-  assert.match(workbenchSource, /result\.sourceStoryId === story\.id/);
+  assert.doesNotMatch(actionsSource, /publishSelectedStories/);
   assert.doesNotMatch(workbenchSource, /WORDPRESS_ACCESS_TOKEN|name="accessToken"|name="siteId"|type="password"/);
+  assert.doesNotMatch(publishSource, /WORDPRESS_ACCESS_TOKEN|name="accessToken"|name="siteId"|type="password"/);
   assert.doesNotMatch(actionsSource, /WORDPRESS_ACCESS_TOKEN|accessToken|siteId/);
   assert.doesNotMatch(actionsSource, /selectPublication/);
   assert.doesNotMatch(workbenchSource, /cron|scheduler|setInterval|node-cron/);
@@ -630,8 +637,9 @@ test("runtime wiring never exposes WordPress credentials to the client module gr
   assert.doesNotMatch(runtimeSource, /NEXT_PUBLIC_WORDPRESS/);
   assert.match(runtimeSource, /readRealWordPressConfig/);
   assert.match(runtimeSource, /new MockWordPress\(\)/);
+  assert.match(runtimeSource, /WordPressComNewsletterPublisher/);
   assert.match(runtimeSource, /new MockIterable\(\)/);
   assert.doesNotMatch(actionsSource, /WORDPRESS_ACCESS_TOKEN|WORDPRESS_SITE_ID/);
-  assert.match(workbenchSource, /mode" value="mock"/);
-  assert.match(workbenchSource, /mode" value="real"/);
+  assert.doesNotMatch(workbenchSource, /mode" value="mock"/);
+  assert.doesNotMatch(workbenchSource, /mode" value="real"/);
 });

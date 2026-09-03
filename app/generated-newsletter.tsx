@@ -18,8 +18,8 @@ export function GeneratedNewsletterPanel({
         <div>
           <h2 id="generate-heading">5. Generate and preview</h2>
           <p>
-            Generate the newsletter from the current layout. Story pages are resolved through Mock
-            WordPress automatically.
+            Generate the newsletter from the current layout. This uses the selected Story and
+            Sponsored blocks and the fixture story URLs. It does not write to WordPress.
           </p>
         </div>
       </div>

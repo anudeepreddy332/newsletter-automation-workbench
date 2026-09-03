@@ -57,6 +57,13 @@
       "when": 1788410656583,
       "tag": "0007_drop_legacy_draft_collections",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1788495000000,
+      "tag": "0008_newsletter_publications",
+      "breakpoints": true
     }
   ]
 }

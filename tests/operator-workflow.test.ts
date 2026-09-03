@@ -9,6 +9,12 @@ import { mockEverflowOfferCatalog } from "@/src/adapters/offers/mock-everflow";
 import { MOCK_WORDPRESS_PROVIDER, MockWordPress } from "@/src/adapters/publishing/mock-wordpress";
 import { REAL_WORDPRESS_PROVIDER } from "@/src/adapters/publishing/real-wordpress";
 import { MOCK_ITERABLE_PROVIDER, MockIterable } from "@/src/adapters/staging/mock-iterable";
+import type { ApprovedNewsletterSnapshot } from "@/src/domain/approval";
+import type {
+  NewsletterPublicationResult,
+  NewsletterPublisher,
+} from "@/src/publishing/newsletter-publisher";
+import { NEWSLETTER_WORDPRESS_PROVIDER } from "@/src/publishing/newsletter-publisher";
 import type { ContentSource } from "@/src/content/content-source";
 import { openContentDatabase } from "@/src/db/database";
 import { applyContentFoundationMigrations } from "@/src/db/migrate";
@@ -58,6 +64,49 @@ class RecordingPublisher implements ContentPublisher {
   }
 }
 
+class RecordingNewsletterPublisher implements NewsletterPublisher {
+  readonly provider = NEWSLETTER_WORDPRESS_PROVIDER;
+  readonly publishCalls: ApprovedNewsletterSnapshot[] = [];
+  readonly updateCalls: Array<{ postId: string; snapshot: ApprovedNewsletterSnapshot }> = [];
+  externalPostId = "90001";
+  url = "https://example.wordpress.com/2026/09/03/poc-newsletter/";
+
+  async publish(approvedSnapshot: ApprovedNewsletterSnapshot): Promise<NewsletterPublicationResult> {
+    this.publishCalls.push(approvedSnapshot);
+    return {
+      status: "published",
+      provider: this.provider,
+      externalPostId: this.externalPostId,
+      url: this.url,
+      approvalFingerprint: approvedSnapshot.approvalFingerprint,
+    };
+  }
+
+  async update(
+    externalPostId: string,
+    approvedSnapshot: ApprovedNewsletterSnapshot,
+  ): Promise<NewsletterPublicationResult> {
+    this.updateCalls.push({ postId: externalPostId, snapshot: approvedSnapshot });
+    return {
+      status: "published",
+      provider: this.provider,
+      externalPostId,
+      url: this.url,
+      approvalFingerprint: approvedSnapshot.approvalFingerprint,
+    };
+  }
+
+  async readExisting(externalPostId: string): Promise<NewsletterPublicationResult> {
+    return {
+      status: "published",
+      provider: this.provider,
+      externalPostId,
+      url: this.url,
+      approvalFingerprint: "",
+    };
+  }
+}
+
 function installNetworkGuard(): () => void {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async () => {
@@ -89,6 +138,7 @@ async function withWorkflow(
     source: CountingSource;
     mockPublisher: RecordingPublisher;
     realPublisher: RecordingPublisher;
+    newsletterPublisher: RecordingNewsletterPublisher;
   }) => Promise<void>,
   options: { fetchStories?: boolean } = {},
 ): Promise<void> {
@@ -113,6 +163,7 @@ async function withWorkflow(
     externalPostId: "88421",
     url: "https://example.wordpress.com/2026/09/02/controlled-story/",
   }));
+  const newsletterPublisher = new RecordingNewsletterPublisher();
   const service = new WorkbenchService(
     source,
     new ContentRepository(db),
@@ -121,13 +172,14 @@ async function withWorkflow(
     realPublisher,
     mockEverflowOfferCatalog,
     new MockIterable(),
+    newsletterPublisher,
   );
   if (options.fetchStories !== false) {
     await service.fetchLatestStories();
   }
 
   try {
-    await run(service, db, { source, mockPublisher, realPublisher });
+    await run(service, db, { source, mockPublisher, realPublisher, newsletterPublisher });
   } finally {
     client.close();
     rmSync(temporaryDirectory, { recursive: true, force: true });
@@ -304,8 +356,8 @@ test("mixed story and sponsored ordering persists across reorder and reload", as
   });
 });
 
-test("generate requires a story block, resolves MockWordPress, and never calls RealWordPress", async () => {
-  await withWorkflow(async (service, _db, { mockPublisher, realPublisher }) => {
+test("generate requires a story block, uses fixture URLs, and never writes to WordPress", async () => {
+  await withWorkflow(async (service, _db, { mockPublisher, realPublisher, newsletterPublisher }) => {
     await service.addOffers([firstOfferId]);
     await assert.rejects(
       service.generateNewsletter(),
@@ -315,27 +367,22 @@ test("generate requires a story block, resolves MockWordPress, and never calls R
     await service.addStories([firstStoryId, secondStoryId]);
     await service.generateNewsletter();
     const state = await service.load();
-    const mockUrls = state.publishingResults
-      .filter((result): result is Extract<PublishingResult, { status: "published" }> =>
-        result.mode === "mock" && result.status === "published",
-      )
-      .map((result) => result.url);
 
     assert.equal(realPublisher.calls.length, 0);
-    assert.equal(mockPublisher.calls.length, 2);
+    assert.equal(mockPublisher.calls.length, 0);
+    assert.equal(newsletterPublisher.publishCalls.length, 0);
     assert.equal(state.generatedNewsletterIsCurrent, true);
-    assert.equal(state.publishingResults.filter((result) => result.mode === "mock").length, 2);
-    for (const url of mockUrls) {
-      assert.match(state.generatedNewsletter?.html ?? "", new RegExp(url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-    }
+    assert.match(state.generatedNewsletter?.html ?? "", /fixture\.example\.test/);
+    assert.doesNotMatch(state.generatedNewsletter?.html ?? "", /wordpress-fixture\.test/);
 
     await service.generateNewsletter();
-    assert.equal(mockPublisher.calls.length, 2);
+    assert.equal(mockPublisher.calls.length, 0);
     assert.equal(realPublisher.calls.length, 0);
+    assert.equal(newsletterPublisher.publishCalls.length, 0);
   });
 });
 
-test("existing real published result still has URL priority during generate", async () => {
+test("existing story publishing results do not change generate output", async () => {
   await withWorkflow(async (service, db, { mockPublisher, realPublisher }) => {
     await service.addStory(firstStoryId);
     const draft = (await service.load()).draft;
@@ -358,7 +405,8 @@ test("existing real published result still has URL priority during generate", as
 
     assert.equal(realPublisher.calls.length, 0);
     assert.equal(mockPublisher.calls.length, 0);
-    assert.match(state.generatedNewsletter?.html ?? "", /https:\/\/example\.wordpress\.com\/2026\/09\/02\/controlled-story\//);
+    assert.doesNotMatch(state.generatedNewsletter?.html ?? "", /example\.wordpress\.com\/2026\/09\/02\/controlled-story/);
+    assert.match(state.generatedNewsletter?.html ?? "", /fixture\.example\.test/);
   });
 });
 
@@ -463,10 +511,12 @@ test("regenerate and approve restores staging eligibility for the new exact snap
     await service.addOffers([firstOfferId]);
     await service.generateNewsletter();
     await service.approveNewsletter();
+    await service.publishApprovedNewsletter();
     const firstReceipt = await service.stageApprovedNewsletter();
     await service.addStory(secondStoryId);
     await service.generateNewsletter();
     await service.approveNewsletter();
+    await service.publishApprovedNewsletter();
     const secondReceipt = await service.stageApprovedNewsletter();
     const repeated = await service.stageApprovedNewsletter();
     const state = await service.load();
@@ -488,7 +538,7 @@ test("no cron, scheduler, real Iterable, or email send exists in the operator wo
     const serviceSource = readFileSync(path.join(process.cwd(), "src/workbench/workbench-service.ts"), "utf8");
 
     assert.doesNotMatch(runtimeSource, /cron|node-cron|BullMQ|setInterval|scheduler/);
-    assert.match(serviceSource, /resolveMockWordPressForStoryBlocks/);
+    assert.doesNotMatch(serviceSource, /resolveMockWordPressForStoryBlocks/);
     assert.match(serviceSource, /async generateNewsletter/);
 
     for (const filePath of files) {

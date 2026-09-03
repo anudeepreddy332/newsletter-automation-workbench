@@ -7,12 +7,18 @@ import type {
   PublishingUnknown,
 } from "@/src/publishing/content-publisher";
 import type { RealWordPressConfig } from "@/src/adapters/publishing/wordpress-config";
+import {
+  asPublishedPost,
+  escapeHtml,
+  formatClientRejection,
+  isTimeoutError,
+  readJsonPayload,
+  sanitizeDiagnostic,
+  WORDPRESS_REQUEST_TIMEOUT_MS,
+  wordpressCreatePostUrl,
+} from "@/src/adapters/publishing/wordpress-http";
 
 export const REAL_WORDPRESS_PROVIDER = "WordPress.com";
-
-const CREATE_POST_URL = (siteId: string) =>
-  `https://public-api.wordpress.com/rest/v1.1/sites/${siteId}/posts/new`;
-const REQUEST_TIMEOUT_MS = 20_000;
 
 export type RealWordPressDependencies = {
   fetch?: typeof fetch;
@@ -45,14 +51,14 @@ export class RealWordPress implements ContentPublisher {
 
     let response: Response;
     try {
-      response = await this.fetchImpl(CREATE_POST_URL(this.config.siteId), {
+      response = await this.fetchImpl(wordpressCreatePostUrl(this.config.siteId), {
         method: "POST",
         headers: {
           Authorization: `Bearer ${this.config.accessToken}`,
           "Content-Type": "application/x-www-form-urlencoded",
         },
         body,
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal: AbortSignal.timeout(WORDPRESS_REQUEST_TIMEOUT_MS),
       });
     } catch (error) {
       if (isTimeoutError(error)) {
@@ -172,120 +178,4 @@ export function buildControlledPostContent(story: Story): string {
     .join("");
 }
 
-export function wordpressCreatePostUrl(siteId: string): string {
-  return CREATE_POST_URL(siteId);
-}
-
-function asPublishedPost(
-  payload: unknown,
-): { id: string; status: string; url: string } | null {
-  if (!payload || typeof payload !== "object") {
-    return null;
-  }
-
-  const record = payload as Record<string, unknown>;
-  if (typeof record.error === "string" && record.error.length > 0) {
-    return null;
-  }
-
-  const id = record.ID;
-  const status = record.status;
-  const url = record.URL;
-  const idText = typeof id === "number" || typeof id === "string" ? String(id).trim() : "";
-  if (!idText || idText === "0" || typeof status !== "string" || typeof url !== "string") {
-    return null;
-  }
-
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      return null;
-    }
-    return { id: idText, status, url: parsed.toString() };
-  } catch {
-    return null;
-  }
-}
-
-async function readJsonPayload(response: Response): Promise<unknown> {
-  const text = await response.text();
-  if (text.length === 0) {
-    return null;
-  }
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return null;
-  }
-}
-
-function isTimeoutError(error: unknown): boolean {
-  return error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
-const MAX_PROVIDER_MESSAGE_LENGTH = 160;
-const PROVIDER_ERROR_CODE_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
-
-function formatClientRejection(status: number, payload: unknown): string {
-  const prefix =
-    status === 401 || status === 403
-      ? "WordPress.com rejected the request because authentication or authorization failed"
-      : "WordPress.com rejected the publishing request";
-  const details = [`HTTP ${status}`];
-  const code = providerErrorCode(payload);
-  if (code) {
-    details.push(`code=${code}`);
-  }
-  const message = providerErrorMessage(payload);
-  if (message) {
-    details.push(message);
-  }
-  return `${prefix} (${details.join("; ")}).`;
-}
-
-function providerErrorCode(payload: unknown): string | undefined {
-  if (!payload || typeof payload !== "object") {
-    return undefined;
-  }
-  const record = payload as Record<string, unknown>;
-  for (const key of ["error", "code"] as const) {
-    const value = record[key];
-    if (typeof value === "string" && PROVIDER_ERROR_CODE_PATTERN.test(value)) {
-      return value;
-    }
-  }
-  return undefined;
-}
-
-function providerErrorMessage(payload: unknown): string | undefined {
-  if (!payload || typeof payload !== "object") {
-    return undefined;
-  }
-  const value = (payload as Record<string, unknown>).message;
-  if (typeof value !== "string") {
-    return undefined;
-  }
-  const collapsed = value.replace(/\s+/g, " ").trim();
-  if (!collapsed) {
-    return undefined;
-  }
-  return collapsed.slice(0, MAX_PROVIDER_MESSAGE_LENGTH);
-}
-
-function sanitizeDiagnostic(diagnostic: string, accessToken: string): string {
-  let sanitized = diagnostic;
-  if (accessToken.length > 0) {
-    sanitized = sanitized.split(accessToken).join("[redacted]");
-  }
-  return sanitized
-    .replace(/Bearer\s+\S+/gi, "Bearer [redacted]")
-    .replace(/[?&](access_token|token|password|client_secret)=[^&\s]+/gi, "[redacted]");
-}
+export { wordpressCreatePostUrl };

@@ -10,6 +10,12 @@ import { mockEverflowOfferCatalog } from "@/src/adapters/offers/mock-everflow";
 import { BenzingaShapedFixtureSource } from "@/src/adapters/rss/benzinga-shaped-rss";
 import { MockWordPress } from "@/src/adapters/publishing/mock-wordpress";
 import { MOCK_ITERABLE_PROVIDER, MockIterable } from "@/src/adapters/staging/mock-iterable";
+import { NEWSLETTER_WORDPRESS_PROVIDER } from "@/src/publishing/newsletter-publisher";
+import type {
+  NewsletterPublicationResult,
+  NewsletterPublisher,
+} from "@/src/publishing/newsletter-publisher";
+import type { NewsletterStager, StagingHandoff, StagingResult } from "@/src/staging/newsletter-stager";
 import { openContentDatabase } from "@/src/db/database";
 import { applyContentFoundationMigrations } from "@/src/db/migrate";
 import type { ContentDatabase } from "@/src/db/database";
@@ -21,7 +27,6 @@ import {
 } from "@/src/newsletter/fingerprint";
 import { ContentRepository } from "@/src/repositories/content-repository";
 import { WorkbenchRepository } from "@/src/repositories/workbench-repository";
-import type { NewsletterStager, StagingResult } from "@/src/staging/newsletter-stager";
 import { WorkbenchService, WorkbenchServiceError } from "@/src/workbench/workbench-service";
 
 const fixturePath = path.join(
@@ -34,17 +39,60 @@ const firstOfferId = "offer_harborline_savings";
 const secondOfferId = "offer_northstar_brokerage";
 const thirdOfferId = "offer_ledgerbay_software";
 
+class RecordingNewsletterPublisher implements NewsletterPublisher {
+  readonly provider = NEWSLETTER_WORDPRESS_PROVIDER;
+  readonly publishCalls: ApprovedNewsletterSnapshot[] = [];
+  readonly updateCalls: Array<{ postId: string; snapshot: ApprovedNewsletterSnapshot }> = [];
+  externalPostId = "90001";
+  url = "https://example.wordpress.com/2026/09/03/poc-newsletter/";
+
+  async publish(approvedSnapshot: ApprovedNewsletterSnapshot): Promise<NewsletterPublicationResult> {
+    this.publishCalls.push(approvedSnapshot);
+    return {
+      status: "published",
+      provider: this.provider,
+      externalPostId: this.externalPostId,
+      url: this.url,
+      approvalFingerprint: approvedSnapshot.approvalFingerprint,
+    };
+  }
+
+  async update(
+    externalPostId: string,
+    approvedSnapshot: ApprovedNewsletterSnapshot,
+  ): Promise<NewsletterPublicationResult> {
+    this.updateCalls.push({ postId: externalPostId, snapshot: approvedSnapshot });
+    return {
+      status: "published",
+      provider: this.provider,
+      externalPostId,
+      url: this.url,
+      approvalFingerprint: approvedSnapshot.approvalFingerprint,
+    };
+  }
+
+  async readExisting(externalPostId: string): Promise<NewsletterPublicationResult> {
+    return {
+      status: "published",
+      provider: this.provider,
+      externalPostId,
+      url: this.url,
+      approvalFingerprint: "",
+    };
+  }
+}
+
 class RecordingStager implements NewsletterStager {
   readonly provider: string;
-  readonly calls: ApprovedNewsletterSnapshot[] = [];
+  readonly calls: StagingHandoff[] = [];
 
   constructor(private readonly inner: NewsletterStager = new MockIterable()) {
     this.provider = inner.provider;
   }
 
-  stage(approvedSnapshot: ApprovedNewsletterSnapshot): StagingResult {
-    this.calls.push(approvedSnapshot);
-    return this.inner.stage(approvedSnapshot);
+  stage(handoff: StagingHandoff): StagingResult {
+    this.calls.push(handoff);
+    return this.inner.stage(handoff);
   }
 }
 
@@ -76,6 +124,7 @@ async function withWorkbench(
   const { client, db } = openContentDatabase(databasePath);
   applyContentFoundationMigrations(db);
   const stager = new RecordingStager();
+  const newsletterPublisher = new RecordingNewsletterPublisher();
   const service = new WorkbenchService(
     new BenzingaShapedFixtureSource(fixturePath),
     new ContentRepository(db),
@@ -84,6 +133,7 @@ async function withWorkbench(
     null,
     mockEverflowOfferCatalog,
     stager,
+    newsletterPublisher,
   );
   await service.fetchLatestStories();
 
@@ -225,7 +275,7 @@ test("offer change invalidates approval for staging", async () => {
   });
 });
 
-test("publishing URL change invalidates approval for staging", async () => {
+test("story publishing URL change does not invalidate generated output", async () => {
   await withWorkbench(async (service, db) => {
     await generateCurrentNewsletter(service);
     await service.approveNewsletter();
@@ -245,13 +295,8 @@ test("publishing URL change invalidates approval for staging", async () => {
       .run();
     const state = await service.load();
 
-    assert.equal(state.generatedNewsletterIsCurrent, false);
-    assert.equal(state.approvalIsCurrent, false);
-    await assert.rejects(
-      service.stageApprovedNewsletter(),
-      (error: unknown) =>
-        error instanceof WorkbenchServiceError && error.code === "NEWSLETTER_STALE",
-    );
+    assert.equal(state.generatedNewsletterIsCurrent, true);
+    assert.equal(state.approvalIsCurrent, true);
   });
 });
 
@@ -262,6 +307,7 @@ test("regenerate and reapprove restores staging eligibility", async () => {
     await service.addOffer(thirdOfferId);
     await service.generateNewsletter();
     await service.approveNewsletter();
+    await service.publishApprovedNewsletter();
     const receipt = await service.stageApprovedNewsletter();
     const state = await service.load();
 
@@ -305,6 +351,7 @@ test("MockIterable staging succeeds for a current approved snapshot", async () =
   await withWorkbench(async (service, _db, stager) => {
     await generateCurrentNewsletter(service);
     await service.approveNewsletter();
+    await service.publishApprovedNewsletter();
     const receipt = await service.stageApprovedNewsletter();
 
     assert.equal(stager.calls.length, 1);
@@ -322,13 +369,17 @@ test("staged content exactly matches the approved snapshot", async () => {
     await service.approveNewsletter();
     const approved = (await service.load()).approvedNewsletter;
     assert.ok(approved);
+    const publication = await service.publishApprovedNewsletter();
     await service.stageApprovedNewsletter();
 
-    assert.deepEqual(stager.calls[0], approved);
-    assert.equal(stager.calls[0]?.subject, generated.subject);
-    assert.equal(stager.calls[0]?.preheader, generated.preheader);
-    assert.equal(stager.calls[0]?.html, generated.html);
-    assert.equal(stager.calls[0]?.plainText, generated.plainText);
+    assert.deepEqual(stager.calls[0]?.approvedSnapshot, approved);
+    assert.equal(stager.calls[0]?.wordpressPostId, publication.externalPostId);
+    assert.equal(stager.calls[0]?.wordpressUrl, publication.url);
+    assert.equal(stager.calls[0]?.wordpressApprovalFingerprint, approved.approvalFingerprint);
+    assert.equal(stager.calls[0]?.approvedSnapshot.subject, generated.subject);
+    assert.equal(stager.calls[0]?.approvedSnapshot.preheader, generated.preheader);
+    assert.equal(stager.calls[0]?.approvedSnapshot.html, generated.html);
+    assert.equal(stager.calls[0]?.approvedSnapshot.plainText, generated.plainText);
   });
 });
 
@@ -336,6 +387,7 @@ test("staging the same approved snapshot twice returns the same receipt", async 
   await withWorkbench(async (service, db, stager) => {
     await generateCurrentNewsletter(service);
     await service.approveNewsletter();
+    await service.publishApprovedNewsletter();
     const first = await service.stageApprovedNewsletter();
     const second = await service.stageApprovedNewsletter();
     const persisted = db.select().from(stagingReceipts).all();
@@ -351,10 +403,12 @@ test("a different newly approved snapshot may create a distinct receipt", async 
   await withWorkbench(async (service, db) => {
     await generateCurrentNewsletter(service);
     await service.approveNewsletter();
+    await service.publishApprovedNewsletter();
     const first = await service.stageApprovedNewsletter();
     await service.addOffer(thirdOfferId);
     await service.generateNewsletter();
     await service.approveNewsletter();
+    await service.publishApprovedNewsletter();
     const second = await service.stageApprovedNewsletter();
     const persisted = db.select().from(stagingReceipts).all();
 
@@ -385,15 +439,24 @@ test("MockIterable ID generation is deterministic", () => {
       inputFingerprint: snapshot.generatedInputFingerprint,
     });
 
-    const first = stager.stage(consistent);
-    const second = stager.stage(consistent);
-    const different = stager.stage(
-      approvedSnapshotFromGenerated("draft_active_poc", {
-        ...consistent,
-        subject: "Different subject",
-        inputFingerprint: consistent.generatedInputFingerprint,
-      }),
-    );
+    const wordpressEvidence = {
+      wordpressPostId: "90001",
+      wordpressUrl: "https://example.wordpress.com/2026/09/03/poc-newsletter/",
+      wordpressApprovalFingerprint: consistent.approvalFingerprint,
+    };
+    const first = stager.stage({ approvedSnapshot: consistent, ...wordpressEvidence });
+    const second = stager.stage({ approvedSnapshot: consistent, ...wordpressEvidence });
+    const differentSnapshot = approvedSnapshotFromGenerated("draft_active_poc", {
+      ...consistent,
+      subject: "Different subject",
+      inputFingerprint: consistent.generatedInputFingerprint,
+    });
+    const different = stager.stage({
+      approvedSnapshot: differentSnapshot,
+      wordpressPostId: "90001",
+      wordpressUrl: "https://example.wordpress.com/2026/09/03/poc-newsletter/",
+      wordpressApprovalFingerprint: differentSnapshot.approvalFingerprint,
+    });
 
     assert.deepEqual(second, first);
     assert.notEqual(different.externalDraftId, first.externalDraftId);

@@ -4,6 +4,8 @@ import type { StagingResult } from "@/src/staging/newsletter-stager";
 type StageIterablePanelProps = {
   canStage: boolean;
   stagingReceipt: StagingResult | null;
+  publicationIsCurrent: boolean;
+  approvalIsCurrent: boolean;
 };
 
 function shortApprovalEvidence(fingerprint: string): string {
@@ -13,14 +15,17 @@ function shortApprovalEvidence(fingerprint: string): string {
 export function StageIterablePanel({
   canStage,
   stagingReceipt,
+  publicationIsCurrent,
+  approvalIsCurrent,
 }: StageIterablePanelProps) {
   return (
     <section className="workflow-panel stage-panel" aria-labelledby="stage-heading">
       <div className="panel-heading">
         <div>
-          <h2 id="stage-heading">7. Stage to Iterable</h2>
+          <h2 id="stage-heading">8. Stage to Iterable</h2>
           <p>
-            Mock Iterable only. This creates or prepares a mock draft. This does not send email.
+            Mock Iterable only. This creates or prepares a mock draft after the approved newsletter
+            is published to WordPress. This does not send email.
           </p>
         </div>
       </div>
@@ -32,8 +37,8 @@ export function StageIterablePanel({
       </form>
       <p className="preparation-hint">
         {canStage
-          ? "Prepares a mock Iterable draft from the approved snapshot. This does not send email."
-          : "Approve the current newsletter before staging."}
+          ? "Prepares a mock Iterable draft from the approved snapshot and current WordPress post. This does not send email."
+          : stagingHint(approvalIsCurrent, publicationIsCurrent)}
       </p>
 
       {stagingReceipt ? (
@@ -59,4 +64,14 @@ export function StageIterablePanel({
       ) : null}
     </section>
   );
+}
+
+function stagingHint(approvalIsCurrent: boolean, publicationIsCurrent: boolean): string {
+  if (!approvalIsCurrent) {
+    return "Approve the current newsletter, then publish it to WordPress before staging.";
+  }
+  if (!publicationIsCurrent) {
+    return "Publish or update the approved newsletter to WordPress before staging.";
+  }
+  return "Approve the current newsletter before staging.";
 }

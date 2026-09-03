@@ -1,5 +1,12 @@
 import type { ApprovedNewsletterSnapshot } from "@/src/domain/approval";
 
+export type StagingHandoff = {
+  approvedSnapshot: ApprovedNewsletterSnapshot;
+  wordpressPostId: string;
+  wordpressUrl: string;
+  wordpressApprovalFingerprint: string;
+};
+
 export type StagingResult = {
   provider: string;
   status: "staged";
@@ -9,7 +16,7 @@ export type StagingResult = {
 
 export interface NewsletterStager {
   readonly provider: string;
-  stage(approvedSnapshot: ApprovedNewsletterSnapshot): StagingResult;
+  stage(handoff: StagingHandoff): StagingResult;
 }
 
 export class NewsletterStagingError extends Error {

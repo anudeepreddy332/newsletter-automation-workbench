@@ -110,3 +110,15 @@ export const stagingReceipts = sqliteTable(
     }),
   ],
 );
+
+export const newsletterPublications = sqliteTable("newsletter_publications", {
+  draftId: text("draft_id")
+    .primaryKey()
+    .references(() => drafts.id, { onDelete: "cascade" }),
+  provider: text("provider").notNull(),
+  status: text("status").notNull(),
+  externalPostId: text("external_post_id"),
+  url: text("url"),
+  approvalFingerprint: text("approval_fingerprint").notNull(),
+  diagnostic: text("diagnostic"),
+});

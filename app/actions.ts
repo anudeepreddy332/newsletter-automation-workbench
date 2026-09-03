@@ -58,12 +58,6 @@ export async function reorderLayout(blockKeys: string[]): Promise<void> {
   revalidatePath("/");
 }
 
-export async function publishSelectedStories(formData: FormData): Promise<void> {
-  const mode = formData.get("mode") === "real" ? "real" : "mock";
-  await workbenchService.publishSelectedStories(mode);
-  revalidatePath("/");
-}
-
 export async function addSelectedOffers(formData: FormData): Promise<void> {
   await workbenchService.addOffers(collectedValues(formData, "offerId"));
   revalidatePath("/");
@@ -86,6 +80,11 @@ export async function generateNewsletter(): Promise<void> {
 
 export async function approveNewsletter(): Promise<void> {
   await workbenchService.approveNewsletter();
+  revalidatePath("/");
+}
+
+export async function publishApprovedNewsletter(): Promise<void> {
+  await workbenchService.publishApprovedNewsletter();
   revalidatePath("/");
 }
 
