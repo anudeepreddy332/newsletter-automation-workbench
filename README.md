@@ -4,9 +4,19 @@
 
 The Newsletter Automation Workbench POC makes a stakeholder-reported,
 multi-step newsletter workflow deterministic, inspectable, and safe to demo.
-It connects controlled story intake, manual editorial choices, mock publishing,
-offer-link selection, deterministic rendering, approval, and staging without
-claiming production automation or sending email.
+It connects an explicit local story fetch, manual editorial choices, a unified
+mixed-block layout, deterministic rendering, exact preview, human approval,
+publication of that approved newsletter as one WordPress.com post, and Mock
+Iterable staging. It does not claim production automation or send email.
+
+## POC ASSUMPTION
+
+The assembled approved newsletter is published as one WordPress post before
+Iterable staging.
+
+This workflow is not yet stakeholder-confirmed. It is a prototype assumption
+for this POC, not a claim about the stakeholder's exact production
+implementation.
 
 ## Current stakeholder-reported workflow
 
@@ -20,43 +30,76 @@ At the current level of understanding, the business workflow is:
 5. Staff manually assemble and format the newsletter in Iterable.
 6. A person reviews the newsletter before Iterable eventually sends it.
 
-The exact WordPress-to-Iterable payload is unresolved. It may include a URL,
-excerpt, full content, image, formatting, metadata, or a combination. The POC
-must not invent that contract.
+The exact WordPress content contract is not confirmed. The exact
+WordPress-to-Iterable payload remains unvalidated. The POC must not invent
+those production contracts.
 
 ## Frozen POC workflow
 
 ```text
 Benzinga-shaped RSS fixtures
-  -> ContentSource adapter
-  -> Single Operator Workbench
-  -> operator selects and orders stories
-  -> WordPress publishing/resolution
-       MockWordPress required/default
-       RealWordPress optional later
-  -> operator selects a Mock Everflow-style offer
-  -> offer adapter provides tracking URL
-  -> deterministic newsletter renderer
-  -> exact HTML and plain-text preview
-  -> human approval
-  -> stage approved snapshot to Mock Iterable
-  -> display receipt
+  -> 1. explicit Fetch latest stories
+  -> 2. choose stories
+  -> 3. choose advertiser links
+  -> 4. arrange one mixed Story/Sponsored layout
+  -> 5. Generate and preview
+       uses selected layout and fixture canonical URLs
+       no WordPress writes
+  -> 6. Review and approve the exact generated snapshot
+  -> 7. Publish the approved newsletter as ONE WordPress.com post
+  -> 8. Stage the approved snapshot plus the current WordPress URL to Mock Iterable
 ```
 
-The POC ends at staging. It performs **no real email send**.
+RSS is fixture-based. WordPress.com is the one real integration. Everflow
+offers are mocked. Iterable is mocked. There is no email send. Exact
+production WordPress and Iterable contracts remain unvalidated.
+
+## Demo
+
+For one-time setup, every-run commands, the click path, shutdown,
+troubleshooting, and a fresh local reset, see
+[docs/DEMO_RUN.md](docs/DEMO_RUN.md).
+
+## WordPress.com configuration
+
+Publishing the approved newsletter to WordPress.com is available when the
+server process has both:
+
+- `WORDPRESS_SITE_ID` — numeric WordPress.com test-site ID
+- `WORDPRESS_ACCESS_TOKEN` — OAuth2 bearer token, exported from the local-only
+  file `.wordpress-demo-token`
+
+Do **not** `source .env.local` and do **not** store the OAuth token in a
+Next.js `.env` file. Env-file and shell-sourcing can transform token
+characters. Follow [docs/DEMO_RUN.md](docs/DEMO_RUN.md).
+
+Do not commit tokens, paste them into the browser, or store them in SQLite.
+`.env.example` documents the site ID variable name only.
+
+Creating a post uses `POST /rest/v1.1/sites/$site/posts/new`. Updating the
+same newsletter post uses `POST /rest/v1.1/sites/$site/posts/$post_ID`. Both
+use `Authorization: Bearer <token>` and `application/x-www-form-urlencoded`
+`title`, `content`, and `status=publish`.
 
 ## POC scope
 
 - One modular application and one operator.
 - Deterministic, fixture-backed RSS intake through a `ContentSource` adapter.
-- Manual story selection and ordering.
-- `MockWordPress` as the required/default deterministic publisher; optional
-  `RealWordPress` only after Milestone 3A passes.
-- A mock Everflow-style offer catalog and tracking URL.
+  The operator must fetch explicitly. Page load does not read the source, and
+  no scheduler is implemented.
+- Manual story and advertiser multi-select, plus one persisted mixed-block
+  layout. Human placement is the advertisement placement policy for this POC.
+- Generate renders from the selected layout and fixture story URLs. It does
+  not write to WordPress.
+- One real integration: publishing the approved newsletter snapshot as one
+  WordPress.com post. Later approved revisions update that same post.
+- A mock Everflow-style offer catalog and tracking URLs.
 - Deterministic newsletter HTML and plain-text rendering.
-- Exact preview, human approval, lightweight revision/approval protection, and
-  duplicate-staging protection.
-- Stage-only `MockIterable` destination with a visible delivery receipt.
+- Exact preview, human approval of that exact snapshot, and approval
+  invalidation when generated output changes.
+- Stage-only `MockIterable` destination after the current WordPress
+  publication matches the current approval. Staging prepares a mock draft; it
+  does not send email.
 - SQLite persistence.
 
 ## Explicit exclusions
@@ -67,8 +110,7 @@ The POC ends at staging. It performs **no real email send**.
   microservices, workflow engines, or production deployment.
 - No target-organization credentials, target-organization WordPress access, or
   multi-site/40-site WordPress fan-out.
-- No client-side credentials; any optional real WordPress credentials are
-  server-side only.
+- No client-side credentials; WordPress credentials are server-side only.
 - No silent fallback from a failed real WordPress call to Mock mode.
 - No live-feed compatibility claim until a representative stakeholder feed is
   available and compared with the provisional fixture contract.
@@ -78,18 +120,21 @@ The POC ends at staging. It performs **no real email send**.
 The POC demo succeeds only when it proves all applicable steps with visible,
 honest results:
 
-1. The same controlled fixture yields the same normalized stories.
-2. The single operator can select and order stories and select a mock offer.
-3. Mock WordPress, Mock Everflow, and Mock Iterable each work independently
-   and identify their own deterministic result.
-4. The renderer produces exact, deterministic HTML and plain-text previews.
-5. A human approval is required before staging; editing invalidates that
-   approval and duplicate staging is prevented.
-6. Staging creates a visible Mock Iterable receipt and does not send email.
-7. If RealWordPress is demonstrated, it targets only the approved disposable
-   WordPress.com site, uses server-side credentials, reports the actual
-   post ID/status/URL, and never falls back silently to Mock mode.
+1. The same controlled fixture yields the same normalized stories after an
+   explicit fetch.
+2. The single operator can choose stories and mock offers, then arrange a mixed
+   Story/Sponsored layout.
+3. Generate produces exact, deterministic HTML and plain-text previews from the
+   current layout without writing to WordPress.
+4. A human approval is required before WordPress publication; editing
+   invalidates that approval.
+5. The approved newsletter is published as one WordPress.com post; repeating
+   the same approval does not create another post; a later approved revision
+   updates the same post.
+6. Staging creates a visible Mock Iterable receipt only after that WordPress
+   publication matches the current approval, and does not send email.
 
-See [the architecture contract](docs/ARCHITECTURE.md),
+See [the demo runbook](docs/DEMO_RUN.md),
+[the architecture contract](docs/ARCHITECTURE.md),
 [assumptions register](docs/ASSUMPTIONS.md), and
 [implementation plan](docs/IMPLEMENTATION_PLAN.md).
