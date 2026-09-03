@@ -536,10 +536,19 @@ test("no cron, scheduler, real Iterable, or email send exists in the operator wo
     const files = roots.flatMap((root) => collectSourceFiles(path.join(process.cwd(), root)));
     const runtimeSource = readFileSync(path.join(process.cwd(), "src/workbench/runtime.ts"), "utf8");
     const serviceSource = readFileSync(path.join(process.cwd(), "src/workbench/workbench-service.ts"), "utf8");
+    const startDemoSource = readFileSync(path.join(process.cwd(), "scripts/start-demo.sh"), "utf8");
+    const liveValidationSource = readFileSync(
+      path.join(process.cwd(), "scripts/live-newsletter-wordpress-validation.ts"),
+      "utf8",
+    );
 
     assert.doesNotMatch(runtimeSource, /cron|node-cron|BullMQ|setInterval|scheduler/);
     assert.doesNotMatch(serviceSource, /resolveMockWordPressForStoryBlocks/);
     assert.match(serviceSource, /async generateNewsletter/);
+    assert.match(startDemoSource, /\.wordpress-demo-token/);
+    assert.doesNotMatch(startDemoSource, /source \.env/);
+    assert.doesNotMatch(startDemoSource, /echo ["']?\$WORDPRESS_ACCESS_TOKEN/);
+    assert.doesNotMatch(liveValidationSource, /\.env\.local/);
 
     for (const filePath of files) {
       const source = readFileSync(filePath, "utf8");

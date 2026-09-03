@@ -54,17 +54,27 @@ RSS is fixture-based. WordPress.com is the one real integration. Everflow
 offers are mocked. Iterable is mocked. There is no email send. Exact
 production WordPress and Iterable contracts remain unvalidated.
 
+## Demo
+
+For one-time setup, every-run commands, the click path, shutdown,
+troubleshooting, and a fresh local reset, see
+[docs/DEMO_RUN.md](docs/DEMO_RUN.md).
+
 ## WordPress.com configuration
 
-Publishing the approved newsletter to WordPress.com is optional until both of
-these server-side environment variables are set:
+Publishing the approved newsletter to WordPress.com is available when the
+server process has both:
 
-- `WORDPRESS_SITE_ID` — numeric WordPress.com site ID
-- `WORDPRESS_ACCESS_TOKEN` — OAuth2 bearer token
+- `WORDPRESS_SITE_ID` — numeric WordPress.com test-site ID
+- `WORDPRESS_ACCESS_TOKEN` — OAuth2 bearer token, exported from the local-only
+  file `.wordpress-demo-token`
 
-Put real values only in a local gitignored `.env` or `.env.local` file. Do not
-commit tokens, paste them into the browser, or store them in SQLite. See
-`.env.example` for variable names only.
+Do **not** `source .env.local` and do **not** store the OAuth token in a
+Next.js `.env` file. Env-file and shell-sourcing can transform token
+characters. Follow [docs/DEMO_RUN.md](docs/DEMO_RUN.md).
+
+Do not commit tokens, paste them into the browser, or store them in SQLite.
+`.env.example` documents the site ID variable name only.
 
 Creating a post uses `POST /rest/v1.1/sites/$site/posts/new`. Updating the
 same newsletter post uses `POST /rest/v1.1/sites/$site/posts/$post_ID`. Both
@@ -124,6 +134,7 @@ honest results:
 6. Staging creates a visible Mock Iterable receipt only after that WordPress
    publication matches the current approval, and does not send email.
 
-See [the architecture contract](docs/ARCHITECTURE.md),
+See [the demo runbook](docs/DEMO_RUN.md),
+[the architecture contract](docs/ARCHITECTURE.md),
 [assumptions register](docs/ASSUMPTIONS.md), and
 [implementation plan](docs/IMPLEMENTATION_PLAN.md).

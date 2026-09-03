@@ -17,7 +17,7 @@ boundary early merely because it appears technically convenient.
 | 5 — Preview + approval + Mock Iterable | Exact preview; human approval; edits invalidate approval; stage-only Mock Iterable; idempotent staging; receipt; no send. | Tests prove approval protection, duplicate-staging protection, receipt visibility, and absence of real delivery. |
 | Operator workflow correction | Explicit fetch; multi-select pickers; unified mixed-block layout; Generate from layout/fixture URLs; exact preview and approval. This is not Milestone 6. | Tests prove fetch honesty, mixed layout identity, exact ordered rendering, stale approval, and MockIterable regressions. |
 | WordPress newsletter publication | Publish the approved newsletter as one WordPress.com post, then stage Mock Iterable. This is a POC assumption, not stakeholder-confirmed production behavior, and is not Milestone 6. | Tests and controlled live CREATE/UPDATE prove one post per draft, same-approval idempotency, revision updates, and staging gated on current WordPress publication. |
-| 6 — Demo hardening | Complete end-to-end happy path; controlled failures; offline deterministic demo; final demo script; limitations/evidence review. | Independent review confirms complete evidence, known limitations, and claims bounded to what the demo proves. |
+| 6 — Demo hardening | Complete end-to-end happy path; controlled failures; offline deterministic demo; final demo runbook (`docs/DEMO_RUN.md`); limitations/evidence review. | Independent review confirms complete evidence, known limitations, and claims bounded to what the demo proves. |
 
 ## Stop conditions
 

@@ -1,3 +1,5 @@
+// Live WordPress CREATE/UPDATE helper. Not the demo path.
+// Loads the token from the process environment or `.wordpress-demo-token`.
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -21,30 +23,17 @@ const firstStoryId = "story_6c43c8a1944281017858d68b";
 const secondStoryId = "story_5c6a67b4a9b7cb360ddc7877";
 const firstOfferId = "offer_harborline_savings";
 
-function loadLocalEnv(): void {
-  const envPath = path.join(process.cwd(), ".env.local");
-  const text = readFileSync(envPath, "utf8");
-  for (const rawLine of text.split("\n")) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith("#")) {
-      continue;
-    }
-    const separator = line.indexOf("=");
-    if (separator <= 0) {
-      continue;
-    }
-    const key = line.slice(0, separator).trim();
-    let value = line.slice(separator + 1).trim();
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-    if (!process.env[key]) {
-      process.env[key] = value;
-    }
+function loadDemoAccessToken(): void {
+  if (process.env.WORDPRESS_ACCESS_TOKEN) {
+    return;
   }
+
+  const tokenPath = path.join(process.cwd(), ".wordpress-demo-token");
+  const token = readFileSync(tokenPath, "utf8").replace(/\r?\n$/, "");
+  if (token.length === 0) {
+    throw new Error("`.wordpress-demo-token` is empty. See docs/DEMO_RUN.md.");
+  }
+  process.env.WORDPRESS_ACCESS_TOKEN = token;
 }
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -117,9 +106,9 @@ function contentMarkers(html: string): string[] {
 }
 
 async function main(): Promise<void> {
-  loadLocalEnv();
+  loadDemoAccessToken();
   const config = readRealWordPressConfig();
-  assert(config, "WORDPRESS_SITE_ID and WORDPRESS_ACCESS_TOKEN must be configured locally.");
+  assert(config, "WORDPRESS_SITE_ID and WORDPRESS_ACCESS_TOKEN must be configured locally. See docs/DEMO_RUN.md.");
 
   const temporaryDirectory = mkdtempSync(path.join(tmpdir(), "newsletter-live-wp-"));
   const databasePath = path.join(temporaryDirectory, "workbench.db");

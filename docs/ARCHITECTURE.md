@@ -67,7 +67,7 @@ WordPress and Iterable contracts remain unvalidated.
 | Preview and approval boundary | Shows the exact render, records human approval bound to that snapshot, and invalidates approval when generated output changes. | Treat a draft as approved without an explicit human action, or publish/stage rebuilt content after approval. |
 | `NewsletterStager` | Provider-neutral staging boundary for an approved snapshot plus current WordPress publication evidence. | Call Iterable, manage an audience, or send email. |
 | `MockIterable` | Stages an approved immutable snapshot with the current WordPress URL and returns an idempotent receipt. | Call Iterable, manage an audience, or send email. |
-| Configuration/secret boundary | Selects adapters and keeps WordPress credentials server-side. | Expose credentials to a browser/client or store them in fixtures. |
+| Configuration/secret boundary | Selects adapters and keeps WordPress credentials server-side. The demo OAuth token is read from gitignored `.wordpress-demo-token` and exported into the process environment. | Expose credentials to a browser/client, store them in fixtures, or load the OAuth token by shell-sourcing `.env.local`. |
 
 ## Adapter boundaries
 

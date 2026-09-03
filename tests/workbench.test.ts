@@ -259,6 +259,7 @@ test("the operator UI is vertical with fetch, choose, arrange, generate, review,
   const publishSource = readFileSync(path.join(process.cwd(), "app/publish-wordpress.tsx"), "utf8");
   const stageSource = readFileSync(path.join(process.cwd(), "app/stage-iterable.tsx"), "utf8");
   const actionsSource = readFileSync(path.join(process.cwd(), "app/actions.ts"), "utf8");
+  const errorSource = readFileSync(path.join(process.cwd(), "app/error.tsx"), "utf8");
 
   assert.doesNotMatch(workbenchSource, /publicationId|selectPublication|Save choice/);
   assert.doesNotMatch(workbenchSource, /workflow-overview|panel-step|Choose newsletter/);
@@ -318,6 +319,8 @@ test("the operator UI is vertical with fetch, choose, arrange, generate, review,
   assert.doesNotMatch(actionsSource, /WORDPRESS_ACCESS_TOKEN|accessToken|siteId/);
   assert.doesNotMatch(actionsSource, /selectPublication/);
   assert.doesNotMatch(workbenchSource, /cron|scheduler|setInterval|node-cron/);
+  assert.doesNotMatch(errorSource, /error\.message|error\.stack/);
+  assert.doesNotMatch(errorSource, /Authorization|WORDPRESS_ACCESS_TOKEN|sqlite|SELECT /);
 });
 
 test("story dropdown labels remain clean after a story is added", async () => {
