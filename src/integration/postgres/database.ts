@@ -18,11 +18,16 @@ export function openIntegrationDatabase(
   const pool = new Pool({
     connectionString: connectionString ?? readIntegrationDatabaseUrl(),
   });
+  let closed = false;
 
   return {
     pool,
     db: drizzle(pool, { schema }),
     close: async () => {
+      if (closed) {
+        return;
+      }
+      closed = true;
       await pool.end();
     },
   };

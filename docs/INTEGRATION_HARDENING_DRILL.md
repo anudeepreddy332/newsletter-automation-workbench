@@ -22,10 +22,25 @@ Local Postgres stores integration/source data only. Phase 1 creates the
 foundation tables (`content_feeds`, `stories`, `offers`) and a repeatable
 migration path. It does not replace SQLite.
 
+## Story synchronization
+
+Phase 2 writes the existing five-story Benzinga-shaped RSS fixture through the
+existing TypeScript parser/normalizer into Postgres. It does not change Fetch
+Stories, SQLite, or the operator workbench.
+
+```bash
+export INTEGRATION_DATABASE_URL=postgres://integration:integration@127.0.0.1:5433/newsletter_integration
+npm run integration:db:migrate
+npm run integration:sync -- stories
+```
+
+Repeated runs stay at five stories. The command requires
+`INTEGRATION_DATABASE_URL`, writes the feed and stories in one transaction, and
+does not print secrets.
+
 ## Not implemented yet
 
 - FastAPI
-- story / RSS synchronization
 - Everflow synchronization
 - retries / backoff
 
