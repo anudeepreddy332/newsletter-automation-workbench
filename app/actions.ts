@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
+import { readNewsletterIntegrationMode } from "@/src/integration/http/config";
 import { workbenchService } from "@/src/workbench/runtime";
 
 function requiredValue(formData: FormData, field: string): string {
@@ -19,8 +21,18 @@ function collectedValues(formData: FormData, field: string): string[] {
 }
 
 export async function fetchLatestStories(): Promise<void> {
-  await workbenchService.fetchLatestStories();
+  try {
+    await workbenchService.fetchLatestStories();
+  } catch (error) {
+    if (readNewsletterIntegrationMode() === "drill") {
+      redirect("/?fetchError=catalog");
+    }
+    throw error;
+  }
   revalidatePath("/");
+  if (readNewsletterIntegrationMode() === "drill") {
+    redirect("/");
+  }
 }
 
 export async function addSelectedStories(formData: FormData): Promise<void> {

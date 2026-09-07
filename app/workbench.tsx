@@ -6,13 +6,20 @@ import { PublishWordpressPanel } from "@/app/publish-wordpress";
 import { ReviewApprovePanel } from "@/app/review-approve";
 import { StageIterablePanel } from "@/app/stage-iterable";
 import { StoryPicker } from "@/app/story-picker";
+import type { NewsletterIntegrationMode } from "@/src/integration/http/config";
 import type { WorkbenchState } from "@/src/domain/workbench";
 
 type WorkbenchProps = {
   state: WorkbenchState;
+  integrationMode?: NewsletterIntegrationMode;
+  fetchFailed?: boolean;
 };
 
-export function Workbench({ state }: WorkbenchProps) {
+export function Workbench({
+  state,
+  integrationMode = "demo",
+  fetchFailed = false,
+}: WorkbenchProps) {
   const selectedStoryIds = state.draft.selectedStories.map((story) => story.id);
   const selectedOfferIds = state.draft.selectedOffers.map((offer) => offer.id);
   const selectedCount = state.draft.selectedStories.length;
@@ -43,8 +50,9 @@ export function Workbench({ state }: WorkbenchProps) {
               <div>
                 <h2 id="fetch-stories-heading">1. Fetch stories</h2>
                 <p>
-                  Read the local sample story fixture into this workbench. This is not a live feed
-                  and does not schedule updates.
+                  {integrationMode === "drill"
+                    ? "Fetch the current normalized story catalog through FastAPI. This does not schedule updates."
+                    : "Read the local sample story fixture into this workbench. This is not a live feed and does not schedule updates."}
                 </p>
               </div>
             </div>
@@ -55,9 +63,16 @@ export function Workbench({ state }: WorkbenchProps) {
             </form>
             <p className="preparation-hint">
               {availableCount === 0
-                ? "No stories are available yet. Fetch latest stories to load the local sample fixture."
+                ? integrationMode === "drill"
+                  ? "No stories are available yet. Fetch latest stories to load the FastAPI catalog."
+                  : "No stories are available yet. Fetch latest stories to load the local sample fixture."
                 : `${availableCount} ${availableCount === 1 ? "story is" : "stories are"} available. Fetch again to refresh the source without removing existing stories.`}
             </p>
+            {fetchFailed ? (
+              <p className="preparation-hint" role="status">
+                Story refresh failed. The last successful snapshot is still available.
+              </p>
+            ) : null}
           </section>
 
           <section className="workflow-panel story-selection-panel" aria-labelledby="story-picker-heading">

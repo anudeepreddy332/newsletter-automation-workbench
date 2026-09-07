@@ -1,0 +1,69 @@
+{
+  "contentFeed": {
+    "id": "content_feed_benzinga_shaped_fixture",
+    "name": "Benzinga-shaped financial-news fixture",
+    "sourceKind": "rss"
+  },
+  "stories": [
+    {
+      "id": "story_6c43c8a1944281017858d68b",
+      "contentFeedId": "content_feed_benzinga_shaped_fixture",
+      "title": "Aurora Grid Reports Higher Storage Orders",
+      "summary": "Aurora Grid said quarterly storage orders rose after a new utility contract expanded its project backlog.",
+      "body": "Aurora Grid reported a rise in quarterly orders for its modular battery systems.",
+      "canonicalUrl": "https://fixture.example.test/news/aurora-grid-storage-orders",
+      "imageUrl": "https://images.example.test/aurora-grid.jpg",
+      "publishedAt": "2026-09-02T03:30:00.000Z",
+      "sourceAuthor": "Market Desk",
+      "sourceItemId": "fixture-aurora-grid-2026-09-02"
+    },
+    {
+      "id": "story_5c6a67b4a9b7cb360ddc7877",
+      "contentFeedId": "content_feed_benzinga_shaped_fixture",
+      "title": "Northline Retail Updates Its Seasonal Outlook",
+      "summary": "Northline Retail raised the lower end of its seasonal sales outlook as early demand improved across home and outdoor categories.",
+      "body": "Northline Retail raised the lower end of its seasonal comparable-sales forecast.",
+      "canonicalUrl": "https://fixture.example.test/news/northline-retail-outlook",
+      "imageUrl": null,
+      "publishedAt": "2026-09-02T05:00:00.000Z",
+      "sourceAuthor": null,
+      "sourceItemId": "fixture-northline-retail-2026-09-02"
+    },
+    {
+      "id": "story_f4144563fa09bd90887c8750",
+      "contentFeedId": "content_feed_benzinga_shaped_fixture",
+      "title": "Calder Ridge Bank Expands Small-Business Lending Pilot",
+      "summary": "Calder Ridge Bank is extending a small-business lending pilot to four additional markets after an initial six-month trial.",
+      "body": "Calder Ridge Bank said it will extend its small-business lending pilot.",
+      "canonicalUrl": "https://fixture.example.test/news/calder-ridge-lending-pilot",
+      "imageUrl": null,
+      "publishedAt": "2026-09-02T06:15:00.000Z",
+      "sourceAuthor": "Elena Park",
+      "sourceItemId": "fixture-calder-ridge-2026-09-02"
+    },
+    {
+      "id": "story_93f71084652e4497fce59719",
+      "contentFeedId": "content_feed_benzinga_shaped_fixture",
+      "title": "Meridian Freight Trims Annual Fuel-Cost Forecast",
+      "summary": "Meridian Freight lowered its annual fuel-cost estimate after route changes reduced empty miles during the summer.",
+      "body": "Meridian Freight lowered its projected annual fuel expense.",
+      "canonicalUrl": "https://fixture.example.test/news/meridian-freight-fuel-forecast",
+      "imageUrl": "https://images.example.test/meridian-freight.jpg",
+      "publishedAt": "2026-09-02T07:40:00.000Z",
+      "sourceAuthor": null,
+      "sourceItemId": "fixture-meridian-freight-2026-09-02"
+    },
+    {
+      "id": "story_59126e4750a900a3ba188f34",
+      "contentFeedId": "content_feed_benzinga_shaped_fixture",
+      "title": "Harborlight Foods Plans Regional Distribution Hub",
+      "summary": "Harborlight Foods plans to open a regional distribution hub intended to shorten delivery times for independent grocers.",
+      "body": "Harborlight Foods plans to open a regional distribution hub outside Pinehaven.",
+      "canonicalUrl": "https://fixture.example.test/news/harborlight-distribution-hub",
+      "imageUrl": "https://images.example.test/harborlight-foods.jpg",
+      "publishedAt": "2026-09-02T09:05:00.000Z",
+      "sourceAuthor": "Jon Bell",
+      "sourceItemId": "fixture-harborlight-foods-2026-09-02"
+    }
+  ]
+}

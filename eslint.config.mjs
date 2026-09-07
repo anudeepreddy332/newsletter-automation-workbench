@@ -3,5 +3,5 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 
 export default defineConfig([
   ...nextVitals,
-  globalIgnores([".next/**", "drizzle/**", "drizzle-postgres/**", "node_modules/**"]),
+  globalIgnores([".next/**", "drizzle/**", "drizzle-postgres/**", "api/.venv/**", "node_modules/**"]),
 ]);

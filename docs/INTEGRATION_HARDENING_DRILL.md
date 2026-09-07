@@ -38,9 +38,34 @@ Repeated runs stay at five stories. The command requires
 `INTEGRATION_DATABASE_URL`, writes the feed and stories in one transaction, and
 does not print secrets.
 
+## FastAPI catalog (drill mode)
+
+Phase 3 adds a read-only FastAPI service that exposes already-normalized
+Postgres stories. TypeScript remains the writer. FastAPI does not parse RSS.
+
+```bash
+python3 -m venv api/.venv
+api/.venv/bin/pip install -r api/requirements-dev.txt
+export INTEGRATION_DATABASE_URL=postgres://integration:integration@127.0.0.1:5433/newsletter_integration
+api/.venv/bin/uvicorn newsletter_integration_api.main:app --host 127.0.0.1 --port 8000 --app-dir api
+```
+
+Drill mode Fetch Stories calls FastAPI, then stores the result in the existing
+SQLite workbench copy. Default demo mode is unchanged and does not need
+Postgres or FastAPI.
+
+```bash
+export NEWSLETTER_INTEGRATION_MODE=drill
+export INTEGRATION_API_BASE_URL=http://127.0.0.1:8000
+export NEWSLETTER_WORKBENCH_DB_PATH=./local-drill-only.db
+npm run dev
+```
+
+Use a separate SQLite file for drill validation. Do not point tests at the
+approved demo database.
+
 ## Not implemented yet
 
-- FastAPI
 - Everflow synchronization
 - retries / backoff
 

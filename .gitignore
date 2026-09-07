@@ -10,3 +10,8 @@ node_modules/
 .wordpress-demo-token
 *.db-wal
 *.db-shm
+__pycache__/
+.pytest_cache/
+.venv/
+api/.venv/
+*.pyc
