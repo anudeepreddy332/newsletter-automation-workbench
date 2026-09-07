@@ -64,9 +64,27 @@ npm run dev
 Use a separate SQLite file for drill validation. Do not point tests at the
 approved demo database.
 
+## Mock advertiser offers
+
+Phase 4 writes a controlled mocked Everflow-style fixture of 10 offers through
+validation, normalization, and a transactional Postgres upsert. This is not
+verified Everflow API compatibility.
+
+```bash
+export INTEGRATION_DATABASE_URL=postgres://integration:integration@127.0.0.1:5433/newsletter_integration
+npm run integration:sync -- offers
+```
+
+Repeated runs stay at 10 offers. Story sync is unchanged:
+
+```bash
+npm run integration:sync -- stories
+```
+
 ## Not implemented yet
 
-- Everflow synchronization
+- FastAPI GET /offers
+- advertiser Fetch button
 - retries / backoff
 
 ## Local Postgres

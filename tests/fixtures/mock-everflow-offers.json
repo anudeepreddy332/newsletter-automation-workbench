@@ -1,0 +1,72 @@
+[
+  {
+    "offer_id": "1001",
+    "advertiser_name": "Cedar Brook Insurance",
+    "name": "Term life quote worksheet",
+    "status": "active",
+    "tracking_url": "https://offers-fixture.test/mock-everflow/track/1001"
+  },
+  {
+    "offer_id": "1002",
+    "advertiser_name": "Pinemoor Credit Union",
+    "name": "Auto refinance checklist",
+    "status": "active",
+    "tracking_url": "https://offers-fixture.test/mock-everflow/track/1002"
+  },
+  {
+    "offer_id": "1003",
+    "advertiser_name": "Lark & Harbor Tax",
+    "name": "Seasonal tax-prep trial",
+    "status": "active",
+    "tracking_url": "https://offers-fixture.test/mock-everflow/track/1003"
+  },
+  {
+    "offer_id": "1004",
+    "advertiser_name": "Westfield Payroll",
+    "name": "Small-team payroll starter",
+    "status": "active",
+    "tracking_url": "https://offers-fixture.test/mock-everflow/track/1004"
+  },
+  {
+    "offer_id": "1005",
+    "advertiser_name": "Oakridge Wealth",
+    "name": "Retirement account comparison",
+    "status": "active",
+    "tracking_url": "https://offers-fixture.test/mock-everflow/track/1005"
+  },
+  {
+    "offer_id": "1006",
+    "advertiser_name": "Blueline Payments",
+    "name": "Card processing review",
+    "status": "active",
+    "tracking_url": "https://offers-fixture.test/mock-everflow/track/1006"
+  },
+  {
+    "offer_id": "1007",
+    "advertiser_name": "Faircurrent Lending",
+    "name": "Home equity guide",
+    "status": "paused",
+    "tracking_url": "https://offers-fixture.test/mock-everflow/track/1007"
+  },
+  {
+    "offer_id": "1008",
+    "advertiser_name": "Nettle & Co Benefits",
+    "name": "Health savings explainer",
+    "status": "active",
+    "tracking_url": "https://offers-fixture.test/mock-everflow/track/1008"
+  },
+  {
+    "offer_id": "1009",
+    "advertiser_name": "Ironpost Storage",
+    "name": "Self-storage rate sheet",
+    "status": "active",
+    "tracking_url": "https://offers-fixture.test/mock-everflow/track/1009"
+  },
+  {
+    "offer_id": "1010",
+    "advertiser_name": "Willowbank Advisors",
+    "name": "Roth conversion briefing",
+    "status": "active",
+    "tracking_url": "https://offers-fixture.test/mock-everflow/track/1010"
+  }
+]
