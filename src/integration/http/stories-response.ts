@@ -5,7 +5,10 @@ export class IntegrationHttpError extends Error {
     readonly code:
       | "STORIES_UNAVAILABLE"
       | "MALFORMED_STORIES_JSON"
-      | "INVALID_STORIES_RESPONSE",
+      | "INVALID_STORIES_RESPONSE"
+      | "OFFERS_UNAVAILABLE"
+      | "MALFORMED_OFFERS_JSON"
+      | "INVALID_OFFERS_RESPONSE",
     message: string,
   ) {
     super(message);

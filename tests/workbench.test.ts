@@ -310,6 +310,7 @@ test("the operator UI is vertical with fetch, choose, arrange, generate, review,
   assert.doesNotMatch(workbenchSource, /WordPress test evidence|Prepare selected stories|mock-ready/);
   assert.doesNotMatch(generatedSource, /Iterable|Approve newsletter/);
   assert.match(actionsSource, /fetchLatestStories/);
+  assert.match(actionsSource, /fetchAdvertiserLinks/);
   assert.match(actionsSource, /approveNewsletter/);
   assert.match(actionsSource, /publishApprovedNewsletter/);
   assert.match(actionsSource, /stageApprovedNewsletter/);

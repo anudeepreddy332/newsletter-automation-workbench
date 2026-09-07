@@ -1,4 +1,4 @@
-import { fetchLatestStories } from "@/app/actions";
+import { fetchAdvertiserLinks, fetchLatestStories } from "@/app/actions";
 import { GeneratedNewsletterPanel } from "@/app/generated-newsletter";
 import { LayoutWorkspace } from "@/app/layout-workspace";
 import { OfferPicker } from "@/app/offer-picker";
@@ -13,12 +13,14 @@ type WorkbenchProps = {
   state: WorkbenchState;
   integrationMode?: NewsletterIntegrationMode;
   fetchFailed?: boolean;
+  offerFetchFailed?: boolean;
 };
 
 export function Workbench({
   state,
   integrationMode = "demo",
   fetchFailed = false,
+  offerFetchFailed = false,
 }: WorkbenchProps) {
   const selectedStoryIds = state.draft.selectedStories.map((story) => story.id);
   const selectedOfferIds = state.draft.selectedOffers.map((offer) => offer.id);
@@ -92,10 +94,34 @@ export function Workbench({
             <div className="panel-heading">
               <div>
                 <h2 id="offer-picker-heading">3. Choose advertiser links</h2>
-                <p>Select one or more sample advertiser offers to include with this newsletter.</p>
+                <p>
+                  {integrationMode === "drill"
+                    ? "Fetch the current advertiser catalog through FastAPI, then select one or more available offers."
+                    : "Select one or more sample advertiser offers to include with this newsletter."}
+                </p>
               </div>
             </div>
-            <p className="sample-offers-note">Sample advertiser offers are used in this prototype.</p>
+            {integrationMode === "drill" ? (
+              <>
+                <form action={fetchAdvertiserLinks}>
+                  <button className="button button-primary prepare-button" type="submit">
+                    Fetch advertiser links
+                  </button>
+                </form>
+                <p className="preparation-hint">
+                  {state.availableOffers.length === 0
+                    ? "No advertiser offers are available yet. Fetch advertiser links to load the FastAPI catalog."
+                    : `${state.availableOffers.length} ${state.availableOffers.length === 1 ? "advertiser offer is" : "advertiser offers are"} available. Fetch again to refresh without removing existing snapshot records.`}
+                </p>
+                {offerFetchFailed ? (
+                  <p className="preparation-hint" role="status">
+                    Advertiser refresh failed. The last successful snapshot is still available.
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <p className="sample-offers-note">Sample advertiser offers are used in this prototype.</p>
+            )}
             <OfferPicker
               offers={state.availableOffers}
               selectedOfferIds={selectedOfferIds}

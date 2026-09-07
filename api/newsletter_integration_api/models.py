@@ -34,6 +34,24 @@ class StoriesResponse(BaseModel):
     stories: list[StoryModel] = Field(default_factory=list)
 
 
+class IntegrationOfferModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    source: str
+    sourceOfferId: str
+    advertiserName: str
+    offerName: str
+    status: Literal["active", "paused"]
+    trackingUrl: str
+
+
+class OffersResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    offers: list[IntegrationOfferModel] = Field(default_factory=list)
+
+
 class HealthResponse(BaseModel):
     status: Literal["ok", "unavailable"]
 

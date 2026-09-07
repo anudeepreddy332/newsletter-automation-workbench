@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from typing import Literal
+
 import psycopg
 
 from newsletter_integration_api.db import DatabaseUnavailable, connect
 from newsletter_integration_api.models import (
     EMPTY_CONTENT_FEED,
     ContentFeedModel,
+    IntegrationOfferModel,
+    OffersResponse,
     StoriesResponse,
     StoryModel,
     utc_timestamp,
@@ -80,3 +84,42 @@ def read_stories_catalog() -> StoriesResponse:
         return StoriesResponse(contentFeed=_content_feed_from_row(feeds[0]), stories=[])
 
     return StoriesResponse(contentFeed=EMPTY_CONTENT_FEED, stories=[])
+
+
+def _offer_status(value: object) -> Literal["active", "paused"]:
+    if value not in ("active", "paused"):
+        raise RuntimeError("unsupported offer status")
+    return value
+
+
+def read_offers_catalog() -> OffersResponse:
+    connection = connect()
+    try:
+        try:
+            rows = connection.execute(
+                """
+                SELECT id, source, source_offer_id, advertiser_name, offer_name,
+                       status, tracking_url
+                FROM offers
+                ORDER BY source ASC, source_offer_id ASC, id ASC
+                """,
+            ).fetchall()
+        except psycopg.Error:
+            raise DatabaseUnavailable() from None
+    finally:
+        connection.close()
+
+    return OffersResponse(
+        offers=[
+            IntegrationOfferModel(
+                id=str(row["id"]),
+                source=str(row["source"]),
+                sourceOfferId=str(row["source_offer_id"]),
+                advertiserName=str(row["advertiser_name"]),
+                offerName=str(row["offer_name"]),
+                status=_offer_status(row["status"]),
+                trackingUrl=str(row["tracking_url"]),
+            )
+            for row in rows
+        ],
+    )

@@ -29,6 +29,11 @@ export type FetchStoriesResult = {
   availableCount: number;
 };
 
+export type FetchOffersResult = {
+  fetchedCount: number;
+  availableCount: number;
+};
+
 export type Draft = {
   id: string;
   publicationId?: string;

@@ -64,6 +64,13 @@
       "when": 1788495000000,
       "tag": "0008_newsletter_publications",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1788793280841,
+      "tag": "0009_offer_snapshots",
+      "breakpoints": true
     }
   ]
 }

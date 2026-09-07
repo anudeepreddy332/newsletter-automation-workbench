@@ -10,6 +10,7 @@ from newsletter_integration_api.db import DatabaseUnavailable
 from newsletter_integration_api.main import app
 from newsletter_integration_api.models import (
     EMPTY_CONTENT_FEED,
+    OffersResponse,
     StoriesResponse,
     StoryModel,
     utc_timestamp,
@@ -184,6 +185,171 @@ def test_stories_returns_five_synchronized_postgres_stories(
         assert len(body["stories"]) == 5
         assert all(story["publishedAt"].endswith("Z") for story in body["stories"])
         assert body["stories"][1]["imageUrl"] is None
+    finally:
+        admin.execute(
+            sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(database_name)),
+        )
+        admin.close()
+
+
+def ten_offer_catalog() -> OffersResponse:
+    fixture = OffersResponse.model_validate_json(
+        (ROOT / "tests/fixtures/integration-offers-response.json").read_text(),
+    )
+    assert len(fixture.offers) == 10
+    return fixture
+
+
+def test_offers_returns_fixture_records(monkeypatch: pytest.MonkeyPatch) -> None:
+    catalog = ten_offer_catalog()
+    monkeypatch.setattr("newsletter_integration_api.main.read_offers_catalog", lambda: catalog)
+    response = client.get("/offers")
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["offers"]) == 10
+    assert body["offers"][0]["source"] == "mock-everflow"
+    assert body["offers"][0]["sourceOfferId"] == "1001"
+    paused = next(offer for offer in body["offers"] if offer["status"] == "paused")
+    assert paused["sourceOfferId"] == "1007"
+    assert paused["status"] == "paused"
+
+
+def test_offers_empty_database(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "newsletter_integration_api.main.read_offers_catalog",
+        lambda: OffersResponse(offers=[]),
+    )
+    response = client.get("/offers")
+    assert response.status_code == 200
+    assert response.json() == {"offers": []}
+
+
+def test_offers_paused_status_is_serialized() -> None:
+    catalog = ten_offer_catalog()
+    paused = next(offer for offer in catalog.offers if offer.status == "paused")
+    dumped = paused.model_dump()
+    assert dumped["status"] == "paused"
+    assert dumped["sourceOfferId"] == "1007"
+
+
+def test_offers_sanitized_database_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail() -> OffersResponse:
+        raise DatabaseUnavailable()
+
+    monkeypatch.setattr("newsletter_integration_api.main.read_offers_catalog", fail)
+    response = client.get("/offers")
+    assert response.status_code == 503
+    assert response.json() == {
+        "error": "Offers catalog is temporarily unavailable.",
+        "code": "DATABASE_UNAVAILABLE",
+    }
+    assert "traceback" not in response.text.lower()
+    assert "postgres://" not in response.text
+
+
+def test_offers_sanitized_internal_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail() -> OffersResponse:
+        raise RuntimeError("password=supersecret postgres://integration:integration@127.0.0.1/db")
+
+    monkeypatch.setattr("newsletter_integration_api.main.read_offers_catalog", fail)
+    response = client.get("/offers")
+    assert response.status_code == 500
+    assert response.json() == {
+        "error": "Offers catalog could not be loaded.",
+        "code": "INTERNAL_ERROR",
+    }
+    assert "supersecret" not in response.text
+    assert "postgres://" not in response.text
+    assert "password=" not in response.text
+
+
+@pytest.mark.skipif(_postgres_available() is None, reason="Postgres is not available")
+def test_offers_empty_postgres_returns_empty_collection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    admin_url = _postgres_available()
+    assert admin_url is not None
+    import psycopg
+    from psycopg import sql
+
+    database_name = f"ihd_api_{os.urandom(4).hex()}"
+    admin = psycopg.connect(admin_url, autocommit=True)
+    try:
+        admin.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(database_name)))
+        parsed = admin_url.rsplit("/", 1)[0] + f"/{database_name}"
+        env = {**os.environ, "INTEGRATION_DATABASE_URL": parsed}
+        subprocess.run(
+            ["npm", "run", "integration:db:migrate"],
+            cwd=ROOT,
+            env=env,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        monkeypatch.setenv("INTEGRATION_DATABASE_URL", parsed)
+        from newsletter_integration_api.catalog import read_offers_catalog as live_read
+
+        catalog = live_read()
+        assert catalog.offers == []
+        response = TestClient(app).get("/offers")
+        assert response.status_code == 200
+        assert response.json() == {"offers": []}
+    finally:
+        admin.execute(
+            sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(database_name)),
+        )
+        admin.close()
+
+
+@pytest.mark.skipif(_postgres_available() is None, reason="Postgres is not available")
+def test_offers_returns_ten_synchronized_postgres_records(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    admin_url = _postgres_available()
+    assert admin_url is not None
+    import psycopg
+    from psycopg import sql
+
+    database_name = f"ihd_api_{os.urandom(4).hex()}"
+    admin = psycopg.connect(admin_url, autocommit=True)
+    try:
+        admin.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(database_name)))
+        parsed = admin_url.rsplit("/", 1)[0] + f"/{database_name}"
+        env = {**os.environ, "INTEGRATION_DATABASE_URL": parsed}
+        subprocess.run(
+            ["npm", "run", "integration:db:migrate"],
+            cwd=ROOT,
+            env=env,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            ["npm", "run", "integration:sync", "--", "offers"],
+            cwd=ROOT,
+            env=env,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        monkeypatch.setenv("INTEGRATION_DATABASE_URL", parsed)
+        from newsletter_integration_api.catalog import read_offers_catalog as live_read
+        from newsletter_integration_api.catalog import read_stories_catalog as live_stories
+
+        catalog = live_read()
+        assert len(catalog.offers) == 10
+        assert {offer.status for offer in catalog.offers} == {"active", "paused"}
+        stories = live_stories()
+        assert stories.stories == []
+        response = TestClient(app).get("/offers")
+        assert response.status_code == 200
+        body = response.json()
+        assert len(body["offers"]) == 10
+        assert all(offer["source"] == "mock-everflow" for offer in body["offers"])
+        assert sum(1 for offer in body["offers"] if offer["status"] == "paused") == 1
+        stories_response = TestClient(app).get("/stories")
+        assert stories_response.status_code == 200
+        assert stories_response.json()["stories"] == []
     finally:
         admin.execute(
             sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(database_name)),

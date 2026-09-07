@@ -6,6 +6,7 @@ import type { ContentSource } from "@/src/content/content-source";
 import { storyBlockKey, type StoredLayoutBlock } from "@/src/domain/layout";
 import type {
   Draft,
+  FetchOffersResult,
   FetchStoriesResult,
   NewsletterBlock,
   WorkbenchState,
@@ -32,6 +33,8 @@ import {
   type StoredDraft,
 } from "@/src/repositories/workbench-repository";
 import type { NewsletterStager, StagingResult } from "@/src/staging/newsletter-stager";
+import type { AdvertiserOfferSource } from "@/src/integration/http/fastapi-offer-source";
+import { OfferSnapshotRepository } from "@/src/repositories/offer-snapshot-repository";
 import type {
   NewsletterPublication,
   NewsletterPublisher,
@@ -61,6 +64,8 @@ export class WorkbenchService {
     private readonly offerCatalog: OfferCatalog = mockEverflowOfferCatalog,
     private readonly stager: NewsletterStager = new MockIterable(),
     private readonly newsletterPublisher: NewsletterPublisher | null = null,
+    private readonly offerSource: AdvertiserOfferSource | null = null,
+    private readonly offerSnapshots: OfferSnapshotRepository | null = null,
   ) {}
 
   async load(): Promise<WorkbenchState> {
@@ -93,6 +98,23 @@ export class WorkbenchService {
       contentFeedId: batch.contentFeed.id,
       fetchedCount: batch.stories.length,
       availableCount: this.contentRepository.listAllStories().length,
+    };
+  }
+
+  async fetchAdvertiserLinks(): Promise<FetchOffersResult> {
+    this.ensureInternalPublication();
+    if (!this.offerSource || !this.offerSnapshots) {
+      throw new WorkbenchServiceError(
+        "OFFER_FETCH_UNAVAILABLE",
+        "Advertiser link fetch is only available in drill mode.",
+      );
+    }
+
+    const offers = await this.offerSource.read();
+    this.offerSnapshots.saveOffers(offers);
+    return {
+      fetchedCount: offers.length,
+      availableCount: this.offerCatalog.list().length,
     };
   }
 
@@ -157,8 +179,15 @@ export class WorkbenchService {
   async addOffers(offerIds: readonly string[]): Promise<void> {
     this.ensureInternalPublication();
     const requested = new Set(offerIds);
+    const available = this.offerCatalog.list();
     for (const offerId of requested) {
-      if (!this.offerCatalog.get(offerId)) {
+      if (!available.some((offer) => offer.id === offerId)) {
+        if (this.offerCatalog.get(offerId)) {
+          throw new WorkbenchServiceError(
+            "INELIGIBLE_OFFER",
+            "The selected advertiser offer is not available for new selection.",
+          );
+        }
         throw new WorkbenchServiceError(
           "UNKNOWN_OFFER",
           "The selected advertiser offer does not exist.",
@@ -172,8 +201,7 @@ export class WorkbenchService {
         .layout.filter((block) => block.kind === "sponsored")
         .map((block) => block.offerId),
     );
-    const blocks: StoredLayoutBlock[] = this.offerCatalog
-      .list()
+    const blocks: StoredLayoutBlock[] = available
       .filter((offer) => requested.has(offer.id) && !alreadySelected.has(offer.id))
       .map((offer) => ({ kind: "sponsored", offerId: offer.id }));
     this.workbenchRepository.appendBlocks(blocks);
@@ -188,6 +216,7 @@ export class WorkbenchService {
     this.ensureInternalPublication();
     const storedDraft = this.workbenchRepository.readActiveDraft();
     const draft = this.hydrateDraft(storedDraft);
+    this.assertSelectedOffersEligible(draft);
     if (draft.selectedStories.length === 0) {
       throw new WorkbenchServiceError(
         "STORIES_REQUIRED",
@@ -206,6 +235,7 @@ export class WorkbenchService {
   async approveNewsletter(): Promise<void> {
     this.ensureInternalPublication();
     const context = this.readNewsletterContext();
+    this.assertSelectedOffersEligible(context.draft);
     if (context.draft.selectedStories.length === 0) {
       throw new WorkbenchServiceError(
         "STORIES_REQUIRED",
@@ -233,6 +263,7 @@ export class WorkbenchService {
   async publishApprovedNewsletter(): Promise<NewsletterPublication> {
     this.ensureInternalPublication();
     const context = this.readNewsletterContext();
+    this.assertSelectedOffersEligible(context.draft);
     this.assertCurrentApprovedNewsletter(context, "publishing");
 
     if (!this.newsletterPublisher) {
@@ -266,6 +297,7 @@ export class WorkbenchService {
   async stageApprovedNewsletter(): Promise<StagingResult> {
     this.ensureInternalPublication();
     const context = this.readNewsletterContext();
+    this.assertSelectedOffersEligible(context.draft);
     if (!context.generatedNewsletter) {
       throw new WorkbenchServiceError(
         "NEWSLETTER_REQUIRED",
@@ -476,6 +508,18 @@ export class WorkbenchService {
     }
   }
 
+  private assertSelectedOffersEligible(draft: Draft): void {
+    const activeIds = new Set(this.offerCatalog.list().map((offer) => offer.id));
+    for (const offer of draft.selectedOffers) {
+      if (!activeIds.has(offer.id)) {
+        throw new WorkbenchServiceError(
+          "INELIGIBLE_OFFER",
+          "A selected advertiser offer is no longer available for newsletter use.",
+        );
+      }
+    }
+  }
+
   private async publishStory(
     draft: StoredDraft,
     story: Draft["selectedStories"][number],
@@ -634,6 +678,8 @@ export class WorkbenchServiceError extends Error {
       | "PUBLISHER_RESULT_MISMATCH"
       | "REAL_SINGLE_STORY_REQUIRED"
       | "UNKNOWN_OFFER"
+      | "INELIGIBLE_OFFER"
+      | "OFFER_FETCH_UNAVAILABLE"
       | "NEWSLETTER_REQUIRED"
       | "NEWSLETTER_STALE"
       | "APPROVAL_REQUIRED"

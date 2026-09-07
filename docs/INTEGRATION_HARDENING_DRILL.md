@@ -81,10 +81,16 @@ Repeated runs stay at 10 offers. Story sync is unchanged:
 npm run integration:sync -- stories
 ```
 
+## Advertiser catalog (drill mode)
+
+Phase 5 exposes Postgres offers through FastAPI `GET /offers`. Drill-mode
+Fetch advertiser links calls that endpoint from the Next.js server, validates
+the JSON contract, and upserts a local SQLite offer snapshot. Page load does
+not call FastAPI. Paused offers stay out of new selection. Default demo mode
+still uses the static mock catalog and does not need Postgres or FastAPI.
+
 ## Not implemented yet
 
-- FastAPI GET /offers
-- advertiser Fetch button
 - retries / backoff
 
 ## Local Postgres

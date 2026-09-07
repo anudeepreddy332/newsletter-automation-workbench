@@ -12,12 +12,15 @@ export default async function Home({
   const fetchError = params.fetchError;
   const fetchFailed =
     fetchError === "catalog" || (Array.isArray(fetchError) && fetchError.includes("catalog"));
+  const offerFetchFailed =
+    fetchError === "offers" || (Array.isArray(fetchError) && fetchError.includes("offers"));
 
   return (
     <Workbench
       state={await workbenchService.load()}
       integrationMode={newsletterIntegrationMode}
       fetchFailed={fetchFailed}
+      offerFetchFailed={offerFetchFailed}
     />
   );
 }

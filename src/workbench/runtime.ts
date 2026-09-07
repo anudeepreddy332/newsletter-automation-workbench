@@ -1,6 +1,5 @@
 import path from "node:path";
 
-import { mockEverflowOfferCatalog } from "@/src/adapters/offers/mock-everflow";
 import { MockWordPress } from "@/src/adapters/publishing/mock-wordpress";
 import { WordPressComNewsletterPublisher } from "@/src/adapters/publishing/wordpress-com-newsletter";
 import { readRealWordPressConfig } from "@/src/adapters/publishing/wordpress-config";
@@ -8,6 +7,11 @@ import { MockIterable } from "@/src/adapters/staging/mock-iterable";
 import { openContentDatabase } from "@/src/db/database";
 import { applyContentFoundationMigrations } from "@/src/db/migrate";
 import { createWorkbenchContentSource } from "@/src/integration/http/create-content-source";
+import {
+  createWorkbenchOfferCatalog,
+  createWorkbenchOfferSnapshots,
+  createWorkbenchOfferSource,
+} from "@/src/integration/http/create-offer-catalog";
 import { readNewsletterIntegrationMode } from "@/src/integration/http/config";
 import { ContentRepository } from "@/src/repositories/content-repository";
 import { WorkbenchRepository } from "@/src/repositories/workbench-repository";
@@ -30,7 +34,9 @@ export const workbenchService = new WorkbenchService(
   new WorkbenchRepository(db),
   new MockWordPress(),
   null,
-  mockEverflowOfferCatalog,
+  createWorkbenchOfferCatalog(db),
   new MockIterable(),
   realWordPressConfig ? new WordPressComNewsletterPublisher(realWordPressConfig) : null,
+  createWorkbenchOfferSource(),
+  createWorkbenchOfferSnapshots(db),
 );

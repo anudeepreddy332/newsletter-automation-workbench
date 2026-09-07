@@ -1,0 +1,94 @@
+{
+  "offers": [
+    {
+      "id": "offer_9b274df57cc91d06448f3d48",
+      "source": "mock-everflow",
+      "sourceOfferId": "1001",
+      "advertiserName": "Cedar Brook Insurance",
+      "offerName": "Term life quote worksheet",
+      "status": "active",
+      "trackingUrl": "https://offers-fixture.test/mock-everflow/track/1001"
+    },
+    {
+      "id": "offer_600cec681c2b80020d5d61f1",
+      "source": "mock-everflow",
+      "sourceOfferId": "1002",
+      "advertiserName": "Pinemoor Credit Union",
+      "offerName": "Auto refinance checklist",
+      "status": "active",
+      "trackingUrl": "https://offers-fixture.test/mock-everflow/track/1002"
+    },
+    {
+      "id": "offer_94d620d6aaf0cb5ab74dd07e",
+      "source": "mock-everflow",
+      "sourceOfferId": "1003",
+      "advertiserName": "Lark & Harbor Tax",
+      "offerName": "Seasonal tax-prep trial",
+      "status": "active",
+      "trackingUrl": "https://offers-fixture.test/mock-everflow/track/1003"
+    },
+    {
+      "id": "offer_6555942c02fd5ab633055769",
+      "source": "mock-everflow",
+      "sourceOfferId": "1004",
+      "advertiserName": "Westfield Payroll",
+      "offerName": "Small-team payroll starter",
+      "status": "active",
+      "trackingUrl": "https://offers-fixture.test/mock-everflow/track/1004"
+    },
+    {
+      "id": "offer_d07994cabc435970ed2b44fc",
+      "source": "mock-everflow",
+      "sourceOfferId": "1005",
+      "advertiserName": "Oakridge Wealth",
+      "offerName": "Retirement account comparison",
+      "status": "active",
+      "trackingUrl": "https://offers-fixture.test/mock-everflow/track/1005"
+    },
+    {
+      "id": "offer_7b4180555bb3667dd1b014b7",
+      "source": "mock-everflow",
+      "sourceOfferId": "1006",
+      "advertiserName": "Blueline Payments",
+      "offerName": "Card processing review",
+      "status": "active",
+      "trackingUrl": "https://offers-fixture.test/mock-everflow/track/1006"
+    },
+    {
+      "id": "offer_5e9d2d10ce75058f4b6b3d19",
+      "source": "mock-everflow",
+      "sourceOfferId": "1007",
+      "advertiserName": "Faircurrent Lending",
+      "offerName": "Home equity guide",
+      "status": "paused",
+      "trackingUrl": "https://offers-fixture.test/mock-everflow/track/1007"
+    },
+    {
+      "id": "offer_e362fd47fb4e58b2fc7721e4",
+      "source": "mock-everflow",
+      "sourceOfferId": "1008",
+      "advertiserName": "Nettle & Co Benefits",
+      "offerName": "Health savings explainer",
+      "status": "active",
+      "trackingUrl": "https://offers-fixture.test/mock-everflow/track/1008"
+    },
+    {
+      "id": "offer_0caa3f5ec2e087589e689978",
+      "source": "mock-everflow",
+      "sourceOfferId": "1009",
+      "advertiserName": "Ironpost Storage",
+      "offerName": "Self-storage rate sheet",
+      "status": "active",
+      "trackingUrl": "https://offers-fixture.test/mock-everflow/track/1009"
+    },
+    {
+      "id": "offer_c651d9dbe2c3d6dd17772145",
+      "source": "mock-everflow",
+      "sourceOfferId": "1010",
+      "advertiserName": "Willowbank Advisors",
+      "offerName": "Roth conversion briefing",
+      "status": "active",
+      "trackingUrl": "https://offers-fixture.test/mock-everflow/track/1010"
+    }
+  ]
+}

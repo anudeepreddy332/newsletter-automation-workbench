@@ -312,6 +312,7 @@ test("normal page reload does not call FastAPI", async () => {
   const pageSource = readFileSync(path.join(process.cwd(), "app/page.tsx"), "utf8");
   assert.match(pageSource, /workbenchService\.load/);
   assert.doesNotMatch(pageSource, /fetchLatestStories/);
+  assert.doesNotMatch(pageSource, /fetchAdvertiserLinks/);
 });
 
 test("existing story selection still works after a FastAPI fetch", async () => {
@@ -341,6 +342,8 @@ test("default demo mode still works without FastAPI or Postgres", () => {
   assert.doesNotMatch(actionsSource, /NEXT_PUBLIC_/);
   assert.doesNotMatch(workbenchSource, /INTEGRATION_API_BASE_URL|NEXT_PUBLIC_/);
   assert.match(workbenchSource, /Fetch latest stories/);
+  assert.match(workbenchSource, /Fetch advertiser links/);
+  assert.match(workbenchSource, /Sample advertiser offers are used in this prototype/);
 });
 
 test("real local HTTP GET /stories returns five synchronized Postgres stories", async (t) => {

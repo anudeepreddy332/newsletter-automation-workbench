@@ -35,6 +35,21 @@ export async function fetchLatestStories(): Promise<void> {
   }
 }
 
+export async function fetchAdvertiserLinks(): Promise<void> {
+  try {
+    await workbenchService.fetchAdvertiserLinks();
+  } catch (error) {
+    if (readNewsletterIntegrationMode() === "drill") {
+      redirect("/?fetchError=offers");
+    }
+    throw error;
+  }
+  revalidatePath("/");
+  if (readNewsletterIntegrationMode() === "drill") {
+    redirect("/");
+  }
+}
+
 export async function addSelectedStories(formData: FormData): Promise<void> {
   await workbenchService.addStories(collectedValues(formData, "storyId"));
   revalidatePath("/");

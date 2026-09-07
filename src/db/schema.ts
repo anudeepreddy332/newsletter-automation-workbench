@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, primaryKey, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
 
 export const contentFeeds = sqliteTable("content_feeds", {
   id: text("id").primaryKey(),
@@ -108,6 +108,22 @@ export const stagingReceipts = sqliteTable(
     primaryKey({
       columns: [table.draftId, table.approvalFingerprint, table.provider],
     }),
+  ],
+);
+
+export const offerSnapshots = sqliteTable(
+  "offer_snapshots",
+  {
+    id: text("id").primaryKey(),
+    source: text("source").notNull(),
+    sourceOfferId: text("source_offer_id").notNull(),
+    advertiserName: text("advertiser_name").notNull(),
+    offerName: text("offer_name").notNull(),
+    status: text("status").notNull(),
+    trackingUrl: text("tracking_url").notNull(),
+  },
+  (table) => [
+    unique("offer_snapshots_source_source_offer_id_unique").on(table.source, table.sourceOfferId),
   ],
 );
 
