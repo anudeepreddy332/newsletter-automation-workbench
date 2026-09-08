@@ -353,6 +353,68 @@ test("all tracked links in 2s is true only when coverage is known and complete",
   assert.equal(duplicateRows[0]!.feature_vector.all_tracked_links_in_2s, false);
 });
 
+test("all_tracked_links_in_2s requires every position 1..N, not distinct-ID count", async () => {
+  const burst = (
+    positions: Array<number | null>,
+    trackedLinkCount: number,
+    idPrefix: string,
+  ) =>
+    positions.map((position, index) =>
+      makeEvent({
+        event_id: `cqe_${idPrefix}${String(index + 1).padStart(2, "0")}`,
+        link_id: `cql_${idPrefix}${String(position ?? 9)}${index}`,
+        link_position: position,
+        tracked_link_count: trackedLinkCount,
+        occurred_at: isoFromT0(index * 40),
+      }),
+    );
+
+  const exact = await extract(burst([1, 2, 3], 3, "aaaaaaaaaaaaaa"));
+  const skipThree = await extract(burst([1, 2, 4], 3, "bbbbbbbbbbbbbb"));
+  const skipTwo = await extract(burst([1, 3], 3, "cccccccccccccc"));
+  const missingPosition = await extract(burst([1, 2, null], 3, "dddddddddddddd"));
+  const duplicates = await extract([
+    makeEvent({
+      event_id: "cqe_eeeeeeeeeeeeee01",
+      link_id: "cql_eeeeeeeeeeeeee01",
+      link_position: 1,
+      tracked_link_count: 2,
+      occurred_at: isoFromT0(0),
+    }),
+    makeEvent({
+      event_id: "cqe_eeeeeeeeeeeeee02",
+      link_id: "cql_eeeeeeeeeeeeee01",
+      link_position: 1,
+      tracked_link_count: 2,
+      occurred_at: isoFromT0(40),
+    }),
+  ]);
+  const extraCannotFill = await extract(burst([1, 2, 4, 5], 3, "ffffffffffffffff"));
+  const reversedExact = await extract(burst([3, 2, 1], 3, "11111111111111"));
+  const reversedGap = await extract(burst([4, 2, 1], 3, "22222222222222"));
+
+  assert.equal(exact[0]!.feature_vector.all_tracked_links_in_2s, true);
+  assert.equal(exact[0]!.feature_status.all_tracked_links_in_2s, "OBSERVED");
+  assert.equal(skipThree[0]!.feature_vector.all_tracked_links_in_2s, false);
+  assert.equal(skipThree[0]!.feature_status.all_tracked_links_in_2s, "OBSERVED");
+  assert.equal(skipTwo[0]!.feature_vector.all_tracked_links_in_2s, false);
+  assert.equal(skipTwo[0]!.feature_status.all_tracked_links_in_2s, "OBSERVED");
+  assert.equal(missingPosition[0]!.feature_vector.all_tracked_links_in_2s, false);
+  assert.equal(missingPosition[0]!.feature_status.all_tracked_links_in_2s, "MISSING");
+  assert.equal(duplicates[0]!.feature_vector.all_tracked_links_in_2s, false);
+  assert.equal(duplicates[0]!.feature_status.all_tracked_links_in_2s, "OBSERVED");
+  assert.equal(extraCannotFill[0]!.feature_vector.all_tracked_links_in_2s, false);
+  assert.equal(extraCannotFill[0]!.feature_status.all_tracked_links_in_2s, "OBSERVED");
+  assert.equal(reversedExact[0]!.feature_vector.all_tracked_links_in_2s, true);
+  assert.equal(reversedGap[0]!.feature_vector.all_tracked_links_in_2s, false);
+  assert.deepEqual(
+    (await extract([...burst([1, 2, 4], 3, "bbbbbbbbbbbbbb")].reverse())).map(
+      (row) => row.feature_vector.all_tracked_links_in_2s,
+    ),
+    skipThree.map((row) => row.feature_vector.all_tracked_links_in_2s),
+  );
+});
+
 test("HTML-order burst requires increasing positions and known positions", async () => {
   const ordered = [1, 2, 3].map((position) =>
     makeEvent({

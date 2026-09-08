@@ -139,6 +139,27 @@ function finalizeCluster(events: EventContext[], startMs: number): BurstCluster 
   };
 }
 
+function allTrackedLinksInTwoSeconds(
+  cluster: BurstCluster,
+  trackedLinkCount: number | null,
+): { value: boolean; status: FeatureStatus } {
+  // Coverage is every required HTML position 1..N in the 2s cluster, not distinct-ID count.
+  if (trackedLinkCount === null) {
+    return { value: false, status: "MISSING" };
+  }
+  const positions = cluster.events.map((item) => item.event.link_position);
+  const known = new Set(positions.filter((position): position is number => position !== null));
+  const required = Array.from({ length: trackedLinkCount }, (_, index) => index + 1);
+  const complete = required.every((position) => known.has(position));
+  if (complete) {
+    return { value: true, status: "OBSERVED" };
+  }
+  if (positions.some((position) => position === null)) {
+    return { value: false, status: "MISSING" };
+  }
+  return { value: false, status: "OBSERVED" };
+}
+
 function emailSecurityAsn(asn: number | null, rules: readonly AsnRule[]): boolean | null {
   if (asn === null) {
     return null;
@@ -266,17 +287,8 @@ function extractOne(
   const distinctLinks = cluster.linkIds.size;
   setFeature(vector, status, "burst_link_count_ge_3", distinctLinks >= 3, "OBSERVED");
 
-  if (event.tracked_link_count === null) {
-    setFeature(vector, status, "all_tracked_links_in_2s", false, "MISSING");
-  } else {
-    setFeature(
-      vector,
-      status,
-      "all_tracked_links_in_2s",
-      distinctLinks >= event.tracked_link_count,
-      "OBSERVED",
-    );
-  }
+  const allTracked = allTrackedLinksInTwoSeconds(cluster, event.tracked_link_count);
+  setFeature(vector, status, "all_tracked_links_in_2s", allTracked.value, allTracked.status);
 
   const positions = cluster.events.map((item) => item.event.link_position);
   if (cluster.events.length < 2) {
