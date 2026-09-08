@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 
 import { sameClassification } from "@/src/click-quality/classifier/canonical";
+import { assertClassificationBatchLineage } from "@/src/click-quality/classifier/lineage";
 import {
   assertThresholdSetCompatible,
   sameThresholdSet,
@@ -54,6 +55,7 @@ export class ClickQualityClassificationRepository {
     classifiedAt: string,
   ): Promise<void> {
     assertThresholdSetCompatible(thresholdSet);
+    assertClassificationBatchLineage(thresholdSet, batch);
     await this.db.transaction(async (tx) => {
       const [existingThreshold] = await tx
         .select()

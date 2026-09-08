@@ -74,7 +74,9 @@ vocabulary. `evidence_report` records every scoring contribution.
 `human_contradiction_min` is the human-score floor that blocks
 `LIKELY_AUTOMATED`. `auto_contradiction_min` is the automation-score floor
 that blocks `LIKELY_HUMAN`. A threshold set whose `classifier_version` does
-not match `cq-clf-v1.0.0` is rejected and not persisted.
+not match `cq-clf-v1.0.0` is rejected and not persisted. Persistence also
+rejects any classification row whose classifier version or threshold-set ID
+does not match both the supplied threshold set and its own evidence report.
 
 Repeated classify stays at 90 rows. Identity or threshold-config mismatch
 fails instead of overwriting.

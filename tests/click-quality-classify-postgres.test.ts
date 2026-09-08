@@ -5,17 +5,22 @@ import test, { describe, type TestContext } from "node:test";
 import { Client } from "pg";
 import { eq } from "drizzle-orm";
 
+import { classifyFeatureRow } from "@/src/click-quality/classifier/classify";
 import { classifyClickQualityFeatures } from "@/src/click-quality/classifier/persist";
 import { ClickQualityClassificationRepository } from "@/src/click-quality/classifier/repository";
 import { FROZEN_THRESHOLD_SET } from "@/src/click-quality/classifier/thresholds";
+import type { Classification } from "@/src/click-quality/classifier/types";
 import { CLASSIFIER_VERSION, THRESHOLD_SET_ID, THRESHOLD_SET_STATUS } from "@/src/click-quality/classifier/versions";
 import {
   ClickQualityClassificationConflictError,
+  ClickQualityClassificationLineageError,
   ClickQualityClassifierVersionMismatchError,
   ClickQualityThresholdConflictError,
 } from "@/src/click-quality/errors";
 import { extractClickQualityFeatures } from "@/src/click-quality/features/persist";
+import { ClickQualityFeatureRepository } from "@/src/click-quality/features/repository";
 import { ingestClickQualityEvents } from "@/src/click-quality/ingest";
+import { makeFeatureRow } from "@/tests/helpers/click-quality-features";
 import {
   openClickQualityDatabase,
   type ClickQualityDatabaseHandle,
@@ -315,6 +320,133 @@ describe("click-quality postgres classification", { concurrency: 1 }, () => {
       assert.equal(await repository.countClassifications(), 90);
     });
   });
+
+  test("valid normal classification persists", async (t) => {
+    const adminUrl = await requirePostgres(t);
+    if (!adminUrl) {
+      return;
+    }
+
+    await withIsolatedDatabase(adminUrl, async (handle) => {
+      await ingestClickQualityEvents({ db: handle.db });
+      await extractClickQualityFeatures({ db: handle.db });
+      const features = await new ClickQualityFeatureRepository(handle.db).listFeatures();
+      const row = classifyFeatureRow(features[0]!, FROZEN_THRESHOLD_SET);
+      const repository = new ClickQualityClassificationRepository(handle.db);
+      await repository.saveClassifiedBatch(FROZEN_THRESHOLD_SET, [row], "2026-09-08T12:00:00.000Z");
+      assert.equal(await repository.countClassifications(), 1);
+      const stored = (await repository.listClassifications())[0]!;
+      assert.equal(stored.classifier_version, CLASSIFIER_VERSION);
+      assert.equal(stored.threshold_set_id, THRESHOLD_SET_ID);
+      assert.equal(stored.evidence_report.classifier_version, stored.classifier_version);
+      assert.equal(stored.evidence_report.threshold_set_id, stored.threshold_set_id);
+      const thresholds = await handle.pool.query<{ threshold_set_id: string }>(
+        `SELECT threshold_set_id FROM click_quality.threshold_sets`,
+      );
+      assert.equal(thresholds.rows.length, 1);
+      assert.equal(thresholds.rows[0]!.threshold_set_id, THRESHOLD_SET_ID);
+    });
+  });
+
+  test("same-classifier custom threshold-set ID still persists", async (t) => {
+    const adminUrl = await requirePostgres(t);
+    if (!adminUrl) {
+      return;
+    }
+
+    await withIsolatedDatabase(adminUrl, async (handle) => {
+      await ingestClickQualityEvents({ db: handle.db });
+      await extractClickQualityFeatures({ db: handle.db });
+      const custom = {
+        ...FROZEN_THRESHOLD_SET,
+        threshold_set_id: "cq-thr-same-classifier-custom-id",
+      };
+      const features = await new ClickQualityFeatureRepository(handle.db).listFeatures();
+      const row = classifyFeatureRow(features[0]!, custom);
+      const repository = new ClickQualityClassificationRepository(handle.db);
+      await repository.saveClassifiedBatch(custom, [row], "2026-09-08T12:00:00.000Z");
+      assert.equal(await repository.countClassifications(), 1);
+      const stored = (await repository.listClassifications())[0]!;
+      assert.equal(stored.classifier_version, CLASSIFIER_VERSION);
+      assert.equal(stored.threshold_set_id, custom.threshold_set_id);
+      assert.equal(stored.evidence_report.threshold_set_id, custom.threshold_set_id);
+      const thresholds = await handle.pool.query<{ threshold_set_id: string; classifier_version: string }>(
+        `SELECT threshold_set_id, classifier_version FROM click_quality.threshold_sets`,
+      );
+      assert.equal(thresholds.rows.length, 1);
+      assert.equal(thresholds.rows[0]!.threshold_set_id, custom.threshold_set_id);
+      assert.equal(thresholds.rows[0]!.classifier_version, CLASSIFIER_VERSION);
+    });
+  });
+
+  for (const [name, mutate] of [
+    [
+      "row.classifier_version different from CLASSIFIER_VERSION",
+      (row: Classification) => {
+        row.classifier_version = "cq-clf-v9.9.9";
+        row.evidence_report.classifier_version = "cq-clf-v9.9.9";
+      },
+    ],
+    [
+      "row.classifier_version different from thresholdSet.classifier_version",
+      (row: Classification) => {
+        row.classifier_version = "cq-clf-v8.0.0";
+        row.evidence_report.classifier_version = "cq-clf-v8.0.0";
+      },
+    ],
+    [
+      "row.threshold_set_id different from supplied thresholdSet.threshold_set_id",
+      (row: Classification) => {
+        row.threshold_set_id = "cq-thr-other-id";
+        row.evidence_report.threshold_set_id = "cq-thr-other-id";
+      },
+    ],
+    [
+      "evidence_report.classifier_version mismatch",
+      (row: Classification) => {
+        row.evidence_report.classifier_version = "cq-clf-v9.9.9";
+      },
+    ],
+    [
+      "evidence_report.threshold_set_id mismatch",
+      (row: Classification) => {
+        row.evidence_report.threshold_set_id = "cq-thr-other-id";
+      },
+    ],
+  ] as const) {
+    test(`${name} is rejected and persists nothing`, async (t) => {
+      const adminUrl = await requirePostgres(t);
+      if (!adminUrl) {
+        return;
+      }
+
+      await withIsolatedDatabase(adminUrl, async (handle) => {
+        const row = classifyFeatureRow(
+          makeFeatureRow({
+            event_id: "cqe_lineage_reject",
+            fires: {
+              ua_known_scanner: true,
+              network_known_email_security_asn: true,
+              js_executed: true,
+              cookie_present: true,
+            },
+          }),
+          FROZEN_THRESHOLD_SET,
+        );
+        mutate(row);
+        const repository = new ClickQualityClassificationRepository(handle.db);
+        await assert.rejects(
+          () => repository.saveClassifiedBatch(FROZEN_THRESHOLD_SET, [row], "2026-09-08T12:00:00.000Z"),
+          ClickQualityClassificationLineageError,
+        );
+        assert.equal(await repository.countClassifications(), 0);
+        const thresholds = await handle.pool.query<{ threshold_set_id: string }>(
+          `SELECT threshold_set_id FROM click_quality.threshold_sets`,
+        );
+        assert.equal(thresholds.rows.length, 0);
+      });
+    });
+  }
 
   test("wrong-version threshold set is rejected and persists nothing", async (t) => {
     const adminUrl = await requirePostgres(t);

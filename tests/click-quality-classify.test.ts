@@ -4,19 +4,24 @@ import path from "node:path";
 import test from "node:test";
 
 import { classifyFeatureRow } from "@/src/click-quality/classifier/classify";
+import { assertClassificationBatchLineage } from "@/src/click-quality/classifier/lineage";
 import { classifyFeatureRows } from "@/src/click-quality/classifier/persist";
 import { scoreFeatureRow } from "@/src/click-quality/classifier/score";
 import {
   FROZEN_THRESHOLD_CONFIG,
   FROZEN_THRESHOLD_SET,
 } from "@/src/click-quality/classifier/thresholds";
+import type { Classification } from "@/src/click-quality/classifier/types";
 import {
   CLASSIFIER_VERSION,
   REASON_CODES,
   THRESHOLD_SET_ID,
   THRESHOLD_SET_STATUS,
 } from "@/src/click-quality/classifier/versions";
-import { ClickQualityClassifierVersionMismatchError } from "@/src/click-quality/errors";
+import {
+  ClickQualityClassificationLineageError,
+  ClickQualityClassifierVersionMismatchError,
+} from "@/src/click-quality/errors";
 import {
   CLICK_QUALITY_ARTIFACTS,
   CLICK_QUALITY_MODULE_SPECS,
@@ -30,6 +35,21 @@ function classify(fires: Parameters<typeof makeFeatureRow>[0]["fires"], extra?: 
   return classifyFeatureRow(
     makeFeatureRow({ event_id: "cqe_aaaaaaaaaaaaaa01", fires, ...extra }),
     FROZEN_THRESHOLD_SET,
+  );
+}
+
+function sampleClassification(thresholdSet = FROZEN_THRESHOLD_SET): Classification {
+  return classifyFeatureRow(
+    makeFeatureRow({
+      event_id: "cqe_lineage_01",
+      fires: {
+        ua_known_scanner: true,
+        network_known_email_security_asn: true,
+        js_executed: true,
+        cookie_present: true,
+      },
+    }),
+    thresholdSet,
   );
 }
 
@@ -430,6 +450,61 @@ test("threshold set with a different classifier_version is rejected before class
       ),
     ClickQualityClassifierVersionMismatchError,
   );
+});
+
+test("classification lineage accepts a valid frozen row", () => {
+  const row = sampleClassification();
+  assert.equal(row.classifier_version, CLASSIFIER_VERSION);
+  assert.equal(row.threshold_set_id, THRESHOLD_SET_ID);
+  assert.doesNotThrow(() => assertClassificationBatchLineage(FROZEN_THRESHOLD_SET, [row]));
+});
+
+test("row.classifier_version different from CLASSIFIER_VERSION is rejected", () => {
+  const row = sampleClassification();
+  row.classifier_version = "cq-clf-v9.9.9";
+  row.evidence_report.classifier_version = "cq-clf-v9.9.9";
+  assert.throws(() => assertClassificationBatchLineage(FROZEN_THRESHOLD_SET, [row]), ClickQualityClassificationLineageError);
+});
+
+test("row.classifier_version different from thresholdSet.classifier_version is rejected", () => {
+  const row = sampleClassification();
+  const mismatchedSet = {
+    ...FROZEN_THRESHOLD_SET,
+    classifier_version: "cq-clf-v9.9.9",
+  };
+  assert.equal(row.classifier_version, CLASSIFIER_VERSION);
+  assert.notEqual(row.classifier_version, mismatchedSet.classifier_version);
+  assert.throws(() => assertClassificationBatchLineage(mismatchedSet, [row]), ClickQualityClassificationLineageError);
+});
+
+test("row.threshold_set_id different from supplied thresholdSet.threshold_set_id is rejected", () => {
+  const row = sampleClassification();
+  row.threshold_set_id = "cq-thr-other-id";
+  row.evidence_report.threshold_set_id = "cq-thr-other-id";
+  assert.throws(() => assertClassificationBatchLineage(FROZEN_THRESHOLD_SET, [row]), ClickQualityClassificationLineageError);
+});
+
+test("evidence_report.classifier_version mismatch is rejected", () => {
+  const row = sampleClassification();
+  row.evidence_report.classifier_version = "cq-clf-v9.9.9";
+  assert.throws(() => assertClassificationBatchLineage(FROZEN_THRESHOLD_SET, [row]), ClickQualityClassificationLineageError);
+});
+
+test("evidence_report.threshold_set_id mismatch is rejected", () => {
+  const row = sampleClassification();
+  row.evidence_report.threshold_set_id = "cq-thr-other-id";
+  assert.throws(() => assertClassificationBatchLineage(FROZEN_THRESHOLD_SET, [row]), ClickQualityClassificationLineageError);
+});
+
+test("same-classifier custom threshold-set ID remains lineage-valid", () => {
+  const custom = {
+    ...FROZEN_THRESHOLD_SET,
+    threshold_set_id: "cq-thr-same-classifier-custom-id",
+  };
+  const row = sampleClassification(custom);
+  assert.equal(row.threshold_set_id, custom.threshold_set_id);
+  assert.equal(row.evidence_report.threshold_set_id, custom.threshold_set_id);
+  assert.doesNotThrow(() => assertClassificationBatchLineage(custom, [row]));
 });
 
 test("same-classifier threshold set with a different id remains accepted", () => {

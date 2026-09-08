@@ -39,6 +39,13 @@ export class ClickQualityClassifierVersionMismatchError extends Error {
   }
 }
 
+export class ClickQualityClassificationLineageError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ClickQualityClassificationLineageError";
+  }
+}
+
 export class ClickQualityClassificationConflictError extends Error {
   readonly eventId: string;
 
