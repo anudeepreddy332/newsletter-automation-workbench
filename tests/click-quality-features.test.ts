@@ -114,12 +114,9 @@ test("closed cq-feat-v1 key set, versions, and UA precedence are frozen", () => 
   ]);
 });
 
-test("classifier and evaluation modules are not implemented", () => {
+test("evaluation modules are not implemented and features do not score", () => {
   const cwd = process.cwd();
   for (const relative of [
-    "src/click-quality/classify.ts",
-    "src/click-quality/score.ts",
-    "src/click-quality/classifier",
     "src/click-quality/evaluate.ts",
     "src/click-quality/evaluation",
     "src/click-quality/eval",

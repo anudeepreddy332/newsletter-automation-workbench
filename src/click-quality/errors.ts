@@ -24,3 +24,20 @@ export class ClickQualityFeatureConflictError extends Error {
     this.eventId = eventId;
   }
 }
+
+export class ClickQualityThresholdConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ClickQualityThresholdConflictError";
+  }
+}
+
+export class ClickQualityClassificationConflictError extends Error {
+  readonly eventId: string;
+
+  constructor(eventId: string, message: string) {
+    super(message);
+    this.name = "ClickQualityClassificationConflictError";
+    this.eventId = eventId;
+  }
+}

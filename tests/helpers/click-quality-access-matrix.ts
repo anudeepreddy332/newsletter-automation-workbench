@@ -63,8 +63,9 @@ export const CLICK_QUALITY_MODULE_SPECS: readonly ClickQualityModuleSpec[] = [
       "src/click-quality/classify.ts",
       "src/click-quality/score.ts",
       "src/click-quality/classifier",
+      "scripts/click-quality-classify.ts",
     ],
-    forbiddenArtifacts: [...SPLIT_AND_LABEL_ARTIFACTS, ...RULE_ARTIFACTS],
+    forbiddenArtifacts: [...SPLIT_AND_LABEL_ARTIFACTS, ...RULE_ARTIFACTS, CLICK_QUALITY_ARTIFACTS.events],
   },
   {
     category: "evaluation",

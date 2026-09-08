@@ -1,4 +1,4 @@
-import { boolean, index, integer, jsonb, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgSchema, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
 
 export const clickQualitySchema = pgSchema("click_quality");
 
@@ -50,3 +50,34 @@ export const clickQualityEventFeatures = clickQualitySchema.table("event_feature
   featureStatus: jsonb("feature_status").notNull(),
   featureVectorHash: text("feature_vector_hash").notNull(),
 });
+
+export const clickQualityThresholdSets = clickQualitySchema.table("threshold_sets", {
+  thresholdSetId: text("threshold_set_id").primaryKey(),
+  status: text("status").notNull(),
+  classifierVersion: text("classifier_version").notNull(),
+  config: jsonb("config").notNull(),
+  notes: text("notes").notNull(),
+});
+
+export const clickQualityClassifications = clickQualitySchema.table(
+  "classifications",
+  {
+    eventId: text("event_id")
+      .notNull()
+      .references(() => clickQualityEventFeatures.eventId),
+    classifierVersion: text("classifier_version").notNull(),
+    thresholdSetId: text("threshold_set_id")
+      .notNull()
+      .references(() => clickQualityThresholdSets.thresholdSetId),
+    decision: text("decision").notNull(),
+    autoScore: integer("auto_score").notNull(),
+    humanScore: integer("human_score").notNull(),
+    conflict: boolean("conflict").notNull(),
+    reasonCodes: text("reason_codes").array().notNull(),
+    evidenceReport: jsonb("evidence_report").notNull(),
+    classifiedAt: timestamp("classified_at", { withTimezone: true, mode: "string" }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.eventId, table.classifierVersion, table.thresholdSetId] }),
+  ],
+);

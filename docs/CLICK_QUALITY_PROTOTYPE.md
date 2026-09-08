@@ -53,6 +53,27 @@ canonical `feature_vector` JSON.
 No scoring, weights, thresholds, classification, ground-truth reads, or
 evaluation metrics exist yet. Feature rows do not store `classifier_version`.
 
+## Phase 3 (implemented)
+
+Deterministic family-max scoring (`classifier_version` `cq-clf-v1.0.0`) reads
+`click_quality.event_features` only and writes `click_quality.classifications`
+plus one frozen threshold row.
+
+```bash
+npm run click-quality:classify
+```
+
+Threshold set `cq-thr-exp90-uncalibrated-v1` has status
+`UNCALIBRATED_EXPERIMENT`. Auto and human scores are separate family-max
+integers, not probabilities. Decisions are `LIKELY_AUTOMATED`,
+`LIKELY_HUMAN`, or `AMBIGUOUS_REVIEW` per request. Reason codes use a closed
+vocabulary. `evidence_report` records every scoring contribution.
+
+**No accuracy evaluation has been performed yet.**
+
+Repeated classify stays at 90 rows. Identity or threshold-config mismatch
+fails instead of overwriting.
+
 ## Boundaries
 
 - No ML and no LLM classifier

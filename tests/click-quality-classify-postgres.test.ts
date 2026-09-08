@@ -3,16 +3,26 @@ import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test, { describe, type TestContext } from "node:test";
 import { Client } from "pg";
+import { eq } from "drizzle-orm";
 
-import { ClickQualityFeatureConflictError } from "@/src/click-quality/errors";
+import { classifyClickQualityFeatures } from "@/src/click-quality/classifier/persist";
+import { ClickQualityClassificationRepository } from "@/src/click-quality/classifier/repository";
+import { FROZEN_THRESHOLD_SET } from "@/src/click-quality/classifier/thresholds";
+import { CLASSIFIER_VERSION, THRESHOLD_SET_ID, THRESHOLD_SET_STATUS } from "@/src/click-quality/classifier/versions";
+import {
+  ClickQualityClassificationConflictError,
+  ClickQualityThresholdConflictError,
+} from "@/src/click-quality/errors";
 import { extractClickQualityFeatures } from "@/src/click-quality/features/persist";
-import { ClickQualityFeatureRepository } from "@/src/click-quality/features/repository";
 import { ingestClickQualityEvents } from "@/src/click-quality/ingest";
 import {
   openClickQualityDatabase,
   type ClickQualityDatabaseHandle,
 } from "@/src/click-quality/postgres/database";
-import { clickQualityEventFeatures } from "@/src/click-quality/postgres/schema";
+import {
+  clickQualityClassifications,
+  clickQualityThresholdSets,
+} from "@/src/click-quality/postgres/schema";
 import {
   INTEGRATION_DATABASE_URL_ENV,
   IntegrationDatabaseConfigError,
@@ -47,6 +57,18 @@ const FROZEN_EVENT_COLUMNS = [
   "source",
   "tracked_link_count",
   "user_agent_raw",
+];
+
+const FROZEN_FEATURE_COLUMNS = [
+  "event_id",
+  "evidence_quality",
+  "extracted_at",
+  "extractor_version",
+  "feature_schema_version",
+  "feature_status",
+  "feature_vector",
+  "feature_vector_hash",
+  "observed_family_count",
 ];
 
 type PostgresProbe = { ok: true; url: string } | { ok: false; reason: string };
@@ -117,7 +139,7 @@ async function withIsolatedDatabase(
   adminUrl: string,
   run: (handle: ClickQualityDatabaseHandle) => Promise<void>,
 ): Promise<void> {
-  const databaseName = `cq_feat_${randomBytes(6).toString("hex")}`;
+  const databaseName = `cq_clf_${randomBytes(6).toString("hex")}`;
   const admin = new Client({ connectionString: adminUrl, connectionTimeoutMillis: 5000 });
   await admin.connect();
   try {
@@ -145,8 +167,8 @@ async function withIsolatedDatabase(
   }
 }
 
-describe("click-quality postgres feature extraction", { concurrency: 1 }, () => {
-  test("migration adds event_features only and leaves events columns unchanged", async (t) => {
+describe("click-quality postgres classification", { concurrency: 1 }, () => {
+  test("migration creates threshold_sets and classifications only as Phase 3 tables", async (t) => {
     const adminUrl = await requirePostgres(t);
     if (!adminUrl) {
       return;
@@ -163,88 +185,34 @@ describe("click-quality postgres feature extraction", { concurrency: 1 }, () => 
         tables.rows.map((row) => row.table_name),
         ["classifications", "event_features", "events", "threshold_sets"],
       );
-
       const forbidden = await handle.pool.query<{ table_name: string }>(
-        `SELECT table_name
-         FROM information_schema.tables
-         WHERE table_name = ANY($1)`,
+        `SELECT table_name FROM information_schema.tables WHERE table_name = ANY($1)`,
         [["evaluation_runs", "ground_truth"]],
       );
       assert.equal(forbidden.rows.length, 0);
 
       const eventColumns = await handle.pool.query<{ column_name: string }>(
-        `SELECT column_name
-         FROM information_schema.columns
-         WHERE table_schema = 'click_quality'
-           AND table_name = 'events'
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_schema = 'click_quality' AND table_name = 'events'
          ORDER BY column_name`,
       );
       assert.deepEqual(
         eventColumns.rows.map((row) => row.column_name),
         FROZEN_EVENT_COLUMNS,
       );
-
       const featureColumns = await handle.pool.query<{ column_name: string }>(
-        `SELECT column_name
-         FROM information_schema.columns
-         WHERE table_schema = 'click_quality'
-           AND table_name = 'event_features'
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_schema = 'click_quality' AND table_name = 'event_features'
          ORDER BY column_name`,
       );
       assert.deepEqual(
         featureColumns.rows.map((row) => row.column_name),
-        [
-          "event_id",
-          "evidence_quality",
-          "extracted_at",
-          "extractor_version",
-          "feature_schema_version",
-          "feature_status",
-          "feature_vector",
-          "feature_vector_hash",
-          "observed_family_count",
-        ].sort(),
-      );
-      assert.equal(
-        featureColumns.rows.some((row) => row.column_name === "classifier_version"),
-        false,
+        [...FROZEN_FEATURE_COLUMNS].sort(),
       );
     });
   });
 
-  test("extracting 90 events twice stays at 90 rows with stable hashes", async (t) => {
-    const adminUrl = await requirePostgres(t);
-    if (!adminUrl) {
-      return;
-    }
-
-    await withIsolatedDatabase(adminUrl, async (handle) => {
-      const ingested = await ingestClickQualityEvents({ db: handle.db });
-      assert.equal(ingested.stored, 90);
-      const first = await extractClickQualityFeatures({
-        db: handle.db,
-        extractedAt: "2026-09-08T09:00:00.000Z",
-      });
-      assert.equal(first.processed, 90);
-      assert.equal(first.stored, 90);
-      const repository = new ClickQualityFeatureRepository(handle.db);
-      const hashes = await repository.listHashes();
-      const second = await extractClickQualityFeatures({
-        db: handle.db,
-        extractedAt: "2026-09-08T10:00:00.000Z",
-      });
-      assert.equal(second.processed, 90);
-      assert.equal(second.stored, 90);
-      assert.deepEqual(await repository.listHashes(), hashes);
-
-      const extractedAt = await handle.pool.query<{ extracted_at: string | Date }>(
-        `SELECT extracted_at FROM click_quality.event_features LIMIT 1`,
-      );
-      assert.equal(new Date(extractedAt.rows[0]!.extracted_at).toISOString(), "2026-09-08T09:00:00.000Z");
-    });
-  });
-
-  test("incompatible stored feature hash fails instead of overwriting", async (t) => {
+  test("classifying 90 feature rows twice stays at 90 with a frozen threshold set", async (t) => {
     const adminUrl = await requirePostgres(t);
     if (!adminUrl) {
       return;
@@ -253,25 +221,107 @@ describe("click-quality postgres feature extraction", { concurrency: 1 }, () => 
     await withIsolatedDatabase(adminUrl, async (handle) => {
       await ingestClickQualityEvents({ db: handle.db });
       await extractClickQualityFeatures({ db: handle.db });
-      await handle.db.update(clickQualityEventFeatures).set({
-        featureVectorHash: "0".repeat(64),
+      const first = await classifyClickQualityFeatures({
+        db: handle.db,
+        classifiedAt: "2026-09-08T12:00:00.000Z",
       });
-      await assert.rejects(
-        () => extractClickQualityFeatures({ db: handle.db }),
-        ClickQualityFeatureConflictError,
+      assert.equal(first.processed, 90);
+      assert.equal(first.stored, 90);
+      const repository = new ClickQualityClassificationRepository(handle.db);
+      const firstRows = await repository.listClassifications();
+      const second = await classifyClickQualityFeatures({
+        db: handle.db,
+        classifiedAt: "2026-09-08T13:00:00.000Z",
+      });
+      assert.equal(second.processed, 90);
+      assert.equal(second.stored, 90);
+      const secondRows = await repository.listClassifications();
+      assert.deepEqual(
+        firstRows.map((row) => ({
+          event_id: row.event_id,
+          decision: row.decision,
+          auto_score: row.auto_score,
+          human_score: row.human_score,
+          conflict: row.conflict,
+          reason_codes: row.reason_codes,
+        })),
+        secondRows.map((row) => ({
+          event_id: row.event_id,
+          decision: row.decision,
+          auto_score: row.auto_score,
+          human_score: row.human_score,
+          conflict: row.conflict,
+          reason_codes: row.reason_codes,
+        })),
       );
-      const repository = new ClickQualityFeatureRepository(handle.db);
-      assert.equal(await repository.countFeatures(), 90);
-      const hashes = await repository.listHashes();
-      assert.ok(hashes.every((row) => row.featureVectorHash === "0".repeat(64)));
+
+      const thresholds = await handle.pool.query<{
+        threshold_set_id: string;
+        status: string;
+        classifier_version: string;
+        config: typeof FROZEN_THRESHOLD_SET.config;
+        notes: string;
+      }>(`SELECT threshold_set_id, status, classifier_version, config, notes FROM click_quality.threshold_sets`);
+      assert.equal(thresholds.rows.length, 1);
+      assert.equal(thresholds.rows[0]!.threshold_set_id, THRESHOLD_SET_ID);
+      assert.equal(thresholds.rows[0]!.status, THRESHOLD_SET_STATUS);
+      assert.equal(thresholds.rows[0]!.classifier_version, CLASSIFIER_VERSION);
+      assert.equal(thresholds.rows[0]!.config.auto_score_min, 6);
+      assert.match(thresholds.rows[0]!.notes, /not production/i);
     });
   });
 
-  test("0002 SQL creates event_features without altering events", () => {
-    const sql = readFileSync("drizzle-postgres/0002_melodic_stature.sql", "utf8");
-    assert.match(sql, /CREATE TABLE "click_quality"\."event_features"/);
+  test("threshold config conflict fails closed", async (t) => {
+    const adminUrl = await requirePostgres(t);
+    if (!adminUrl) {
+      return;
+    }
+
+    await withIsolatedDatabase(adminUrl, async (handle) => {
+      await ingestClickQualityEvents({ db: handle.db });
+      await extractClickQualityFeatures({ db: handle.db });
+      await classifyClickQualityFeatures({ db: handle.db });
+      await handle.db
+        .update(clickQualityThresholdSets)
+        .set({ notes: "tampered notes" })
+        .where(eq(clickQualityThresholdSets.thresholdSetId, THRESHOLD_SET_ID));
+      await assert.rejects(
+        () => classifyClickQualityFeatures({ db: handle.db }),
+        ClickQualityThresholdConflictError,
+      );
+    });
+  });
+
+  test("changed classification under the same identity fails closed", async (t) => {
+    const adminUrl = await requirePostgres(t);
+    if (!adminUrl) {
+      return;
+    }
+
+    await withIsolatedDatabase(adminUrl, async (handle) => {
+      await ingestClickQualityEvents({ db: handle.db });
+      await extractClickQualityFeatures({ db: handle.db });
+      await classifyClickQualityFeatures({ db: handle.db });
+      await handle.db.update(clickQualityClassifications).set({
+        decision: "LIKELY_HUMAN",
+        autoScore: 0,
+      });
+      await assert.rejects(
+        () => classifyClickQualityFeatures({ db: handle.db }),
+        ClickQualityClassificationConflictError,
+      );
+      const repository = new ClickQualityClassificationRepository(handle.db);
+      assert.equal(await repository.countClassifications(), 90);
+    });
+  });
+
+  test("0003 SQL creates Phase 3 tables without altering events or event_features", () => {
+    const sql = readFileSync("drizzle-postgres/0003_lazy_iron_man.sql", "utf8");
+    assert.match(sql, /CREATE TABLE "click_quality"\."classifications"/);
+    assert.match(sql, /CREATE TABLE "click_quality"\."threshold_sets"/);
     assert.equal(sql.includes("ALTER TABLE \"click_quality\".\"events\""), false);
-    assert.equal(sql.includes("DROP TABLE"), false);
-    assert.equal(sql.includes("classifier_version"), false);
+    assert.equal(sql.includes("ALTER TABLE \"click_quality\".\"event_features\""), false);
+    assert.equal(sql.includes("evaluation_runs"), false);
+    assert.equal(sql.includes("ground_truth"), false);
   });
 });

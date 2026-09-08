@@ -70,4 +70,18 @@ export class ClickQualityFeatureRepository {
       })
       .from(clickQualityEventFeatures);
   }
+
+  async listFeatures(): Promise<ExtractedFeatures[]> {
+    const rows = await this.db.select().from(clickQualityEventFeatures);
+    return rows.map((row) => ({
+      event_id: row.eventId,
+      feature_schema_version: row.featureSchemaVersion,
+      extractor_version: row.extractorVersion,
+      evidence_quality: row.evidenceQuality as ExtractedFeatures["evidence_quality"],
+      observed_family_count: row.observedFamilyCount,
+      feature_vector: row.featureVector as ExtractedFeatures["feature_vector"],
+      feature_status: row.featureStatus as ExtractedFeatures["feature_status"],
+      feature_vector_hash: row.featureVectorHash,
+    }));
+  }
 }
