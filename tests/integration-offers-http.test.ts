@@ -305,7 +305,7 @@ test("failed advertiser fetch preserves the previous snapshot", async () => {
       throw new Error("connect ECONNREFUSED");
     }
     return jsonResponse(offerFixturePayload);
-  });
+  }, { sleep: async () => undefined });
 
   await withTempDrillWorkbench(
     new BenzingaShapedFixtureSource(rssFixturePath),

@@ -89,9 +89,16 @@ the JSON contract, and upserts a local SQLite offer snapshot. Page load does
 not call FastAPI. Paused offers stay out of new selection. Default demo mode
 still uses the static mock catalog and does not need Postgres or FastAPI.
 
+## Bounded retries
+
+Phase 6 retries FastAPI `GET /stories` and `GET /offers` from the Next.js
+server only. The policy is 3 total attempts, a 2-second per-attempt timeout,
+an 8-second overall budget, full jitter, and Retry-After when present.
+Local databases, fixtures, WordPress, and Iterable are not retried.
+
 ## Not implemented yet
 
-- retries / backoff
+- circuit breakers / queues / schedulers
 
 ## Local Postgres
 

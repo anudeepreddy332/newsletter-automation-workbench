@@ -256,7 +256,7 @@ test("FastAPI failure preserves the previous SQLite snapshot and selection", asy
       throw new Error("connect ECONNREFUSED");
     }
     return jsonResponse(fixturePayload);
-  });
+  }, { sleep: async () => undefined });
 
   await withTempWorkbench(source, async (service) => {
     await service.fetchLatestStories();

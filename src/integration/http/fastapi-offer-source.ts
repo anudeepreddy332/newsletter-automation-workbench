@@ -1,12 +1,14 @@
 import { readIntegrationApiBaseUrl } from "@/src/integration/http/config";
 import { parseOffersResponse } from "@/src/integration/http/offers-response";
+import {
+  fetchWithRetry,
+  type FetchLike,
+  type IntegrationRetryOptions,
+} from "@/src/integration/http/retry";
 import { IntegrationHttpError } from "@/src/integration/http/stories-response";
 import type { IntegrationOffer } from "@/src/integration/offers/model";
 
-export type FetchLike = (
-  input: string,
-  init?: RequestInit,
-) => Promise<Response>;
+export type { FetchLike } from "@/src/integration/http/retry";
 
 export interface AdvertiserOfferSource {
   read(): Promise<IntegrationOffer[]>;
@@ -16,20 +18,30 @@ export class FastApiOfferSource implements AdvertiserOfferSource {
   constructor(
     private readonly baseUrl: string = readIntegrationApiBaseUrl(),
     private readonly fetchImpl: FetchLike = fetch,
+    private readonly retryOptions: IntegrationRetryOptions = {},
   ) {}
 
   async read(): Promise<IntegrationOffer[]> {
     const url = `${this.baseUrl.replace(/\/+$/, "")}/offers`;
     let response: Response;
     try {
-      response = await this.fetchImpl(url, {
-        method: "GET",
-        cache: "no-store",
-        headers: {
-          Accept: "application/json",
-          "Cache-Control": "no-cache",
+      response = await fetchWithRetry(
+        url,
+        {
+          method: "GET",
+          cache: "no-store",
+          headers: {
+            Accept: "application/json",
+            "Cache-Control": "no-cache",
+          },
         },
-      });
+        {
+          fetch: this.fetchImpl,
+          sleep: this.retryOptions.sleep,
+          random: this.retryOptions.random,
+          now: this.retryOptions.now,
+        },
+      );
     } catch {
       throw new IntegrationHttpError(
         "OFFERS_UNAVAILABLE",
