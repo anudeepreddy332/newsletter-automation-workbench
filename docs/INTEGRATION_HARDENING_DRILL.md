@@ -3,6 +3,8 @@
 This is an educational integration drill. It does **not** change the approved
 main demo architecture, and it is **not** production-ready.
 
+**Screen-share startup:** [INTEGRATION_DEMO_RUNBOOK.md](./INTEGRATION_DEMO_RUNBOOK.md)
+
 ## What stays the same
 
 SQLite continues to own newsletter workflow state:
