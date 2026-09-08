@@ -1,38 +1,21 @@
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import path from "node:path";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { CLICK_QUALITY_EVENTS_FIXTURE_PATH } from "@/src/click-quality/events-fixture";
+import {
+  CLICK_QUALITY_ARTIFACTS,
+  CLICK_QUALITY_MODULE_SPECS,
+  categoryForRuntimeFile,
+  listClickQualityRuntimeFiles,
+  resolveModuleFiles,
+} from "@/tests/helpers/click-quality-access-matrix";
 import {
   CLICK_QUALITY_GROUND_TRUTH_PATH,
   hashChallengeEvents,
   readChallengeLock,
   readClickQualityManifest,
 } from "@/tests/helpers/click-quality-challenge-lock";
-
-const FORBIDDEN_RUNTIME_MARKERS = [
-  "ground-truth.v1.json",
-  "experiment-manifest.v1.json",
-  "challenge.lock.v1.json",
-  "ua-rules.v1.json",
-  "asn-rules.v1.json",
-];
-
-function walkFiles(dir: string): string[] {
-  const entries = readdirSync(dir);
-  const files: string[] = [];
-  for (const entry of entries) {
-    const full = path.join(dir, entry);
-    const stat = statSync(full);
-    if (stat.isDirectory()) {
-      files.push(...walkFiles(full));
-    } else if (/\.(ts|tsx|js|mjs)$/.test(entry)) {
-      files.push(full);
-    }
-  }
-  return files;
-}
 
 test("manifest contains exactly 60 exploratory and 30 challenge rows covering every event once", () => {
   const events = JSON.parse(readFileSync(CLICK_QUALITY_EVENTS_FIXTURE_PATH, "utf8")) as Array<{
@@ -67,47 +50,69 @@ test("ground truth covers all 90 events with AUTOMATED, HUMAN, or UNKNOWN only",
   }
 });
 
-test("runtime click-quality modules cannot access ground truth, manifest, or phase-2 rule files", () => {
-  const roots = [
-    path.join(process.cwd(), "src/click-quality"),
-    path.join(process.cwd(), "scripts/click-quality-ingest.ts"),
-  ];
-  const files = roots.flatMap((root) => {
-    const stat = statSync(root);
-    return stat.isDirectory() ? walkFiles(root) : [root];
-  });
+test("every src/click-quality file belongs to a declared module category", () => {
+  const files = listClickQualityRuntimeFiles();
+  assert.ok(files.length > 0);
+  for (const file of files) {
+    assert.ok(
+      categoryForRuntimeFile(file),
+      `${file} is not assigned to ingestion, features, classifier, or evaluation`,
+    );
+  }
+});
+
+test("ingestion modules cannot read split, labels, challenge lock, or UA/ASN rules", () => {
+  const spec = CLICK_QUALITY_MODULE_SPECS.find((item) => item.category === "ingestion");
+  assert.ok(spec);
+  const files = resolveModuleFiles(spec);
   assert.ok(files.length > 0);
   for (const file of files) {
     const source = readFileSync(file, "utf8");
-    for (const marker of FORBIDDEN_RUNTIME_MARKERS) {
+    for (const marker of spec.forbiddenArtifacts) {
       assert.equal(source.includes(marker), false, `${file} mentions ${marker}`);
     }
   }
-  assert.ok(CLICK_QUALITY_EVENTS_FIXTURE_PATH.endsWith("events.v1.json"));
+  assert.ok(CLICK_QUALITY_EVENTS_FIXTURE_PATH.endsWith(CLICK_QUALITY_ARTIFACTS.events));
 });
 
-test("future feature and classifier modules, if present, also cannot import eval artifacts", () => {
-  const futureRoots = [
-    path.join(process.cwd(), "src/click-quality/features"),
-    path.join(process.cwd(), "src/click-quality/classify.ts"),
-    path.join(process.cwd(), "src/click-quality/features.ts"),
-    path.join(process.cwd(), "src/click-quality/score.ts"),
-    path.join(process.cwd(), "src/click-quality/evaluate.ts"),
-  ];
-  for (const root of futureRoots) {
-    try {
-      const stat = statSync(root);
-      const files = stat.isDirectory() ? walkFiles(root) : [root];
-      for (const file of files) {
-        const source = readFileSync(file, "utf8");
-        for (const marker of ["ground-truth.v1.json", "experiment-manifest.v1.json"]) {
-          assert.equal(source.includes(marker), false, `${file} mentions ${marker}`);
-        }
-      }
-    } catch (error) {
-      assert.ok((error as NodeJS.ErrnoException).code === "ENOENT");
+test("feature extractor modules, if present, cannot read split or labels", () => {
+  const spec = CLICK_QUALITY_MODULE_SPECS.find((item) => item.category === "features");
+  assert.ok(spec);
+  const files = resolveModuleFiles(spec);
+  for (const file of files) {
+    const source = readFileSync(file, "utf8");
+    for (const marker of spec.forbiddenArtifacts) {
+      assert.equal(source.includes(marker), false, `${file} mentions ${marker}`);
     }
   }
+  assert.equal(spec.forbiddenArtifacts.includes(CLICK_QUALITY_ARTIFACTS.uaRules), false);
+  assert.equal(spec.forbiddenArtifacts.includes(CLICK_QUALITY_ARTIFACTS.asnRules), false);
+});
+
+test("classifier modules, if present, cannot read split, labels, or UA/ASN rule files", () => {
+  const spec = CLICK_QUALITY_MODULE_SPECS.find((item) => item.category === "classifier");
+  assert.ok(spec);
+  const files = resolveModuleFiles(spec);
+  for (const file of files) {
+    const source = readFileSync(file, "utf8");
+    for (const marker of spec.forbiddenArtifacts) {
+      assert.equal(source.includes(marker), false, `${file} mentions ${marker}`);
+    }
+  }
+});
+
+test("evaluation harness modules, if present, are allowed to read manifest, ground truth, and challenge lock", () => {
+  const spec = CLICK_QUALITY_MODULE_SPECS.find((item) => item.category === "evaluation");
+  assert.ok(spec);
+  assert.deepEqual([...spec.forbiddenArtifacts], []);
+  for (const artifact of [
+    CLICK_QUALITY_ARTIFACTS.manifest,
+    CLICK_QUALITY_ARTIFACTS.groundTruth,
+    CLICK_QUALITY_ARTIFACTS.challengeLock,
+  ]) {
+    assert.equal(spec.forbiddenArtifacts.includes(artifact), false);
+  }
+  assert.ok(Array.isArray(resolveModuleFiles(spec)));
 });
 
 test("challenge IDs cannot be recovered from prefix, suffix, file order, or numeric range", () => {
