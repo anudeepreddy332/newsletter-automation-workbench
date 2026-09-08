@@ -143,18 +143,29 @@ function allTrackedLinksInTwoSeconds(
   cluster: BurstCluster,
   trackedLinkCount: number | null,
 ): { value: boolean; status: FeatureStatus } {
-  // Coverage is every required HTML position 1..N in the 2s cluster, not distinct-ID count.
+  // Coverage is every required HTML position 1..N AND at least N distinct link_id
+  // values among those in-range observations. Extra/out-of-range events do not count.
   if (trackedLinkCount === null) {
     return { value: false, status: "MISSING" };
   }
-  const positions = cluster.events.map((item) => item.event.link_position);
-  const known = new Set(positions.filter((position): position is number => position !== null));
-  const required = Array.from({ length: trackedLinkCount }, (_, index) => index + 1);
-  const complete = required.every((position) => known.has(position));
-  if (complete) {
+  const requiredPositions = Array.from({ length: trackedLinkCount }, (_, index) => index + 1);
+  const required = new Set(requiredPositions);
+  const inRange = cluster.events.filter((item) => {
+    const position = item.event.link_position;
+    return position !== null && required.has(position);
+  });
+  const knownRequiredPositions = new Set(
+    inRange.map((item) => item.event.link_position).filter((position): position is number => position !== null),
+  );
+  const distinctRequiredLinks = new Set(inRange.map((item) => item.event.link_id));
+  const positionsComplete = requiredPositions.every((position) => knownRequiredPositions.has(position));
+  const linksComplete = distinctRequiredLinks.size >= trackedLinkCount;
+  if (positionsComplete && linksComplete) {
     return { value: true, status: "OBSERVED" };
   }
-  if (positions.some((position) => position === null)) {
+  const relevantPositionMissing = !positionsComplete &&
+    cluster.events.some((item) => item.event.link_position === null);
+  if (relevantPositionMissing) {
     return { value: false, status: "MISSING" };
   }
   return { value: false, status: "OBSERVED" };

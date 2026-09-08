@@ -415,6 +415,145 @@ test("all_tracked_links_in_2s requires every position 1..N, not distinct-ID coun
   );
 });
 
+test("all_tracked_links_in_2s requires N distinct in-range link IDs", async () => {
+  const abc = await extract([
+    makeEvent({
+      event_id: "cqe_aaaa111111111101",
+      link_id: "cql_aaaa11111111110a",
+      link_position: 1,
+      tracked_link_count: 3,
+      occurred_at: isoFromT0(0),
+    }),
+    makeEvent({
+      event_id: "cqe_aaaa111111111102",
+      link_id: "cql_aaaa11111111110b",
+      link_position: 2,
+      tracked_link_count: 3,
+      occurred_at: isoFromT0(40),
+    }),
+    makeEvent({
+      event_id: "cqe_aaaa111111111103",
+      link_id: "cql_aaaa11111111110c",
+      link_position: 3,
+      tracked_link_count: 3,
+      occurred_at: isoFromT0(80),
+    }),
+  ]);
+  const aab = await extract([
+    makeEvent({
+      event_id: "cqe_bbbb111111111101",
+      link_id: "cql_bbbb11111111110a",
+      link_position: 1,
+      tracked_link_count: 3,
+      occurred_at: isoFromT0(0),
+    }),
+    makeEvent({
+      event_id: "cqe_bbbb111111111102",
+      link_id: "cql_bbbb11111111110a",
+      link_position: 2,
+      tracked_link_count: 3,
+      occurred_at: isoFromT0(40),
+    }),
+    makeEvent({
+      event_id: "cqe_bbbb111111111103",
+      link_id: "cql_bbbb11111111110b",
+      link_position: 3,
+      tracked_link_count: 3,
+      occurred_at: isoFromT0(80),
+    }),
+  ]);
+  const extraCannotRepair = await extract([
+    makeEvent({
+      event_id: "cqe_cccc111111111101",
+      link_id: "cql_cccc11111111110a",
+      link_position: 1,
+      tracked_link_count: 3,
+      occurred_at: isoFromT0(0),
+    }),
+    makeEvent({
+      event_id: "cqe_cccc111111111102",
+      link_id: "cql_cccc11111111110a",
+      link_position: 2,
+      tracked_link_count: 3,
+      occurred_at: isoFromT0(40),
+    }),
+    makeEvent({
+      event_id: "cqe_cccc111111111103",
+      link_id: "cql_cccc11111111110b",
+      link_position: 3,
+      tracked_link_count: 3,
+      occurred_at: isoFromT0(80),
+    }),
+    makeEvent({
+      event_id: "cqe_cccc111111111104",
+      link_id: "cql_cccc11111111110c",
+      link_position: 4,
+      tracked_link_count: 3,
+      occurred_at: isoFromT0(120),
+    }),
+  ]);
+  const duplicateSamePosition = await extract([
+    makeEvent({
+      event_id: "cqe_dddd111111111101",
+      link_id: "cql_dddd11111111110a",
+      link_position: 1,
+      tracked_link_count: 3,
+      occurred_at: isoFromT0(0),
+    }),
+    makeEvent({
+      event_id: "cqe_dddd111111111102",
+      link_id: "cql_dddd11111111110a",
+      link_position: 1,
+      tracked_link_count: 3,
+      occurred_at: isoFromT0(40),
+    }),
+    makeEvent({
+      event_id: "cqe_dddd111111111103",
+      link_id: "cql_dddd11111111110b",
+      link_position: 2,
+      tracked_link_count: 3,
+      occurred_at: isoFromT0(80),
+    }),
+  ]);
+  const reversedAab = await extract([
+    makeEvent({
+      event_id: "cqe_eeee111111111103",
+      link_id: "cql_eeee11111111110b",
+      link_position: 3,
+      tracked_link_count: 3,
+      occurred_at: isoFromT0(80),
+    }),
+    makeEvent({
+      event_id: "cqe_eeee111111111102",
+      link_id: "cql_eeee11111111110a",
+      link_position: 2,
+      tracked_link_count: 3,
+      occurred_at: isoFromT0(40),
+    }),
+    makeEvent({
+      event_id: "cqe_eeee111111111101",
+      link_id: "cql_eeee11111111110a",
+      link_position: 1,
+      tracked_link_count: 3,
+      occurred_at: isoFromT0(0),
+    }),
+  ]);
+
+  assert.equal(abc[0]!.feature_vector.all_tracked_links_in_2s, true);
+  assert.equal(abc[0]!.feature_status.all_tracked_links_in_2s, "OBSERVED");
+  assert.equal(aab[0]!.feature_vector.all_tracked_links_in_2s, false);
+  assert.equal(aab[0]!.feature_status.all_tracked_links_in_2s, "OBSERVED");
+  assert.equal(extraCannotRepair[0]!.feature_vector.all_tracked_links_in_2s, false);
+  assert.equal(extraCannotRepair[0]!.feature_status.all_tracked_links_in_2s, "OBSERVED");
+  assert.equal(duplicateSamePosition[0]!.feature_vector.all_tracked_links_in_2s, false);
+  assert.equal(duplicateSamePosition[0]!.feature_status.all_tracked_links_in_2s, "OBSERVED");
+  assert.equal(reversedAab[0]!.feature_vector.all_tracked_links_in_2s, false);
+  assert.deepEqual(
+    reversedAab.map((row) => row.feature_vector.all_tracked_links_in_2s).sort(),
+    aab.map((row) => row.feature_vector.all_tracked_links_in_2s).sort(),
+  );
+});
+
 test("HTML-order burst requires increasing positions and known positions", async () => {
   const ordered = [1, 2, 3].map((position) =>
     makeEvent({
