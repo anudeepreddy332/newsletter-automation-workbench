@@ -50,7 +50,11 @@ export const CLICK_QUALITY_MODULE_SPECS: readonly ClickQualityModuleSpec[] = [
   },
   {
     category: "features",
-    roots: ["src/click-quality/features.ts", "src/click-quality/features"],
+    roots: [
+      "src/click-quality/features.ts",
+      "src/click-quality/features",
+      "scripts/click-quality-extract-features.ts",
+    ],
     forbiddenArtifacts: [...SPLIT_AND_LABEL_ARTIFACTS],
   },
   {

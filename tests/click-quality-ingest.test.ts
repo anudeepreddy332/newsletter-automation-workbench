@@ -143,14 +143,14 @@ test("migration creates click_quality.events and no later-phase tables", async (
     );
     assert.deepEqual(
       created.rows.map((row) => row.table_name),
-      ["events"],
+      ["event_features", "events"],
     );
 
     const forbidden = await handle.pool.query<{ table_name: string }>(
       `SELECT table_name
        FROM information_schema.tables
        WHERE table_name = ANY($1)`,
-      [["event_features", "threshold_sets", "classifications", "evaluation_runs", "ground_truth"]],
+      [["threshold_sets", "classifications", "evaluation_runs", "ground_truth"]],
     );
     assert.equal(forbidden.rows.length, 0);
   });

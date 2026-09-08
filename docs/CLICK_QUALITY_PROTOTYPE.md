@@ -28,8 +28,30 @@ npm run click-quality:ingest
 
 Repeated ingest keeps 90 rows. The loader reads `events.v1.json` only.
 
-Not in this phase: feature extraction, scoring, classification, evaluation
-metrics, dashboards, or UI.
+## Phase 2 (implemented)
+
+Deterministic `cq-feat-v1` extraction (`extractor_version` `cq-extractor-v1.0.0`)
+writes one append-only row per event to `click_quality.event_features`.
+
+```bash
+npm run click-quality:extract-features
+```
+
+v1 permits only one feature row per `event_id`. Repeat runs stay at 90 rows.
+A hash mismatch for the same schema/extractor versions fails instead of
+overwriting. `extracted_at` is not part of feature identity.
+
+Families: F1 transport/client, F2 network, F3 velocity/burst, F4 recurrence,
+F5 client capability, F6 human-plausible timing, F7 context. No
+`forward_candidate`. UA precedence is `known_scanner > http_library >
+headless_browser > browser_like`. ASN email-security is synthetic-rule only.
+
+Evidence quality is `COMPLETE` / `PARTIAL` / `SPARSE`. Feature status is
+`OBSERVED` / `MISSING` / `NOT_APPLICABLE`. `feature_vector_hash` is SHA-256 of
+canonical `feature_vector` JSON.
+
+No scoring, weights, thresholds, classification, ground-truth reads, or
+evaluation metrics exist yet. Feature rows do not store `classifier_version`.
 
 ## Boundaries
 

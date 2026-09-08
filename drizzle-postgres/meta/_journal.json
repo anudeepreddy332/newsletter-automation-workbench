@@ -15,6 +15,13 @@
       "when": 1788853149777,
       "tag": "0001_unusual_bastion",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788858281790,
+      "tag": "0002_melodic_stature",
+      "breakpoints": true
     }
   ]
 }

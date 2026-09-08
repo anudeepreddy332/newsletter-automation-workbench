@@ -14,7 +14,8 @@
     "integration:db:generate": "drizzle-kit generate --config drizzle.pg.config.ts",
     "integration:db:migrate": "tsx src/integration/postgres/run-migrations.ts",
     "integration:sync": "tsx scripts/sync-integration.ts",
-    "click-quality:ingest": "tsx scripts/click-quality-ingest.ts"
+    "click-quality:ingest": "tsx scripts/click-quality-ingest.ts",
+    "click-quality:extract-features": "tsx scripts/click-quality-extract-features.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

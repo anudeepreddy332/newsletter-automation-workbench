@@ -1,4 +1,4 @@
-import { boolean, index, integer, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
 
 export const clickQualitySchema = pgSchema("click_quality");
 
@@ -36,3 +36,17 @@ export const clickQualityEvents = clickQualitySchema.table(
     ),
   ],
 );
+
+export const clickQualityEventFeatures = clickQualitySchema.table("event_features", {
+  eventId: text("event_id")
+    .primaryKey()
+    .references(() => clickQualityEvents.eventId),
+  featureSchemaVersion: text("feature_schema_version").notNull(),
+  extractorVersion: text("extractor_version").notNull(),
+  extractedAt: timestamp("extracted_at", { withTimezone: true, mode: "string" }).notNull(),
+  evidenceQuality: text("evidence_quality").notNull(),
+  observedFamilyCount: integer("observed_family_count").notNull(),
+  featureVector: jsonb("feature_vector").notNull(),
+  featureStatus: jsonb("feature_status").notNull(),
+  featureVectorHash: text("feature_vector_hash").notNull(),
+});
