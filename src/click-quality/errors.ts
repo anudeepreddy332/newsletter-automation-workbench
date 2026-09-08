@@ -32,6 +32,13 @@ export class ClickQualityThresholdConflictError extends Error {
   }
 }
 
+export class ClickQualityClassifierVersionMismatchError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ClickQualityClassifierVersionMismatchError";
+  }
+}
+
 export class ClickQualityClassificationConflictError extends Error {
   readonly eventId: string;
 

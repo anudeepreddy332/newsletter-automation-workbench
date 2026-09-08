@@ -4,6 +4,7 @@ import {
   THRESHOLD_SET_NOTES,
   THRESHOLD_SET_STATUS,
 } from "@/src/click-quality/classifier/versions";
+import { ClickQualityClassifierVersionMismatchError } from "@/src/click-quality/errors";
 
 export type ThresholdConfig = {
   auto_score_min: number;
@@ -53,6 +54,14 @@ const CONFIG_KEYS: Array<keyof ThresholdConfig> = [
 
 export function canonicalThresholdConfigJson(config: ThresholdConfig): string {
   return `{${CONFIG_KEYS.map((key) => `${JSON.stringify(key)}:${JSON.stringify(config[key])}`).join(",")}}`;
+}
+
+export function assertThresholdSetCompatible(thresholdSet: ThresholdSet): void {
+  if (thresholdSet.classifier_version !== CLASSIFIER_VERSION) {
+    throw new ClickQualityClassifierVersionMismatchError(
+      `Threshold set ${thresholdSet.threshold_set_id} declares classifier_version ${thresholdSet.classifier_version}, but this classifier is ${CLASSIFIER_VERSION}. Classification was not performed.`,
+    );
+  }
 }
 
 export function sameThresholdSet(left: ThresholdSet, right: ThresholdSet): boolean {

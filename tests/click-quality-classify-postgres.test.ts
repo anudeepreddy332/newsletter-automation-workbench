@@ -11,6 +11,7 @@ import { FROZEN_THRESHOLD_SET } from "@/src/click-quality/classifier/thresholds"
 import { CLASSIFIER_VERSION, THRESHOLD_SET_ID, THRESHOLD_SET_STATUS } from "@/src/click-quality/classifier/versions";
 import {
   ClickQualityClassificationConflictError,
+  ClickQualityClassifierVersionMismatchError,
   ClickQualityThresholdConflictError,
 } from "@/src/click-quality/errors";
 import { extractClickQualityFeatures } from "@/src/click-quality/features/persist";
@@ -312,6 +313,38 @@ describe("click-quality postgres classification", { concurrency: 1 }, () => {
       );
       const repository = new ClickQualityClassificationRepository(handle.db);
       assert.equal(await repository.countClassifications(), 90);
+    });
+  });
+
+  test("wrong-version threshold set is rejected and persists nothing", async (t) => {
+    const adminUrl = await requirePostgres(t);
+    if (!adminUrl) {
+      return;
+    }
+
+    await withIsolatedDatabase(adminUrl, async (handle) => {
+      await ingestClickQualityEvents({ db: handle.db });
+      await extractClickQualityFeatures({ db: handle.db });
+      const incompatible = {
+        ...FROZEN_THRESHOLD_SET,
+        threshold_set_id: "cq-thr-wrong-classifier-persist",
+        classifier_version: "cq-clf-v9.9.9",
+      };
+      await assert.rejects(
+        () =>
+          classifyClickQualityFeatures({
+            db: handle.db,
+            thresholdSet: incompatible,
+          }),
+        ClickQualityClassifierVersionMismatchError,
+      );
+
+      const repository = new ClickQualityClassificationRepository(handle.db);
+      assert.equal(await repository.countClassifications(), 0);
+      const thresholds = await handle.pool.query<{ threshold_set_id: string }>(
+        `SELECT threshold_set_id FROM click_quality.threshold_sets`,
+      );
+      assert.equal(thresholds.rows.length, 0);
     });
   });
 

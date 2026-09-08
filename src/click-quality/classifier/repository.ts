@@ -1,8 +1,11 @@
 import { and, eq } from "drizzle-orm";
 
 import { sameClassification } from "@/src/click-quality/classifier/canonical";
-import type { ThresholdSet } from "@/src/click-quality/classifier/thresholds";
-import { sameThresholdSet } from "@/src/click-quality/classifier/thresholds";
+import {
+  assertThresholdSetCompatible,
+  sameThresholdSet,
+  type ThresholdSet,
+} from "@/src/click-quality/classifier/thresholds";
 import type { Classification, EvidenceReport } from "@/src/click-quality/classifier/types";
 import type { Decision, ReasonCode } from "@/src/click-quality/classifier/versions";
 import {
@@ -50,6 +53,7 @@ export class ClickQualityClassificationRepository {
     batch: readonly Classification[],
     classifiedAt: string,
   ): Promise<void> {
+    assertThresholdSetCompatible(thresholdSet);
     await this.db.transaction(async (tx) => {
       const [existingThreshold] = await tx
         .select()

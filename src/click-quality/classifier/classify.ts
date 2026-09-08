@@ -4,7 +4,7 @@ import { EXTRACTOR_VERSION, FEATURE_SCHEMA_VERSION } from "@/src/click-quality/f
 import { collectReasonCodes } from "@/src/click-quality/classifier/reasons";
 import { decideClassification } from "@/src/click-quality/classifier/decide";
 import { scoreFeatureRow } from "@/src/click-quality/classifier/score";
-import type { ThresholdSet } from "@/src/click-quality/classifier/thresholds";
+import { assertThresholdSetCompatible, type ThresholdSet } from "@/src/click-quality/classifier/thresholds";
 import type { Classification } from "@/src/click-quality/classifier/types";
 import { CLASSIFIER_VERSION, REASON_CODES } from "@/src/click-quality/classifier/versions";
 
@@ -17,6 +17,7 @@ export function assertClassifiableFeatureRow(row: ExtractedFeatures): void {
 }
 
 export function classifyFeatureRow(row: ExtractedFeatures, thresholdSet: ThresholdSet): Classification {
+  assertThresholdSetCompatible(thresholdSet);
   assertClassifiableFeatureRow(row);
   const scores = scoreFeatureRow(row);
   const { decision, conflict } = decideClassification(row, scores, thresholdSet.config);

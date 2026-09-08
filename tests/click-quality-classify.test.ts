@@ -16,6 +16,7 @@ import {
   THRESHOLD_SET_ID,
   THRESHOLD_SET_STATUS,
 } from "@/src/click-quality/classifier/versions";
+import { ClickQualityClassifierVersionMismatchError } from "@/src/click-quality/errors";
 import {
   CLICK_QUALITY_ARTIFACTS,
   CLICK_QUALITY_MODULE_SPECS,
@@ -333,6 +334,124 @@ test("evidence_report includes lineage, family max winners, and weighted feature
     "delay_from_send_ge_60s_single_click",
   ]);
   assert.equal(result.reason_codes.includes("AUTO_HEAD_REQUEST"), false);
+});
+
+test("LIKELY_AUTOMATED uses human_contradiction_min, not auto_contradiction_min", () => {
+  const thresholdSet = {
+    ...FROZEN_THRESHOLD_SET,
+    threshold_set_id: "cq-thr-asymmetric-auto-gate",
+    config: {
+      ...FROZEN_THRESHOLD_CONFIG,
+      auto_contradiction_min: 1,
+      human_contradiction_min: 3,
+      conflict_auto_floor: 9,
+      conflict_human_floor: 9,
+    },
+  };
+  const result = classifyFeatureRow(
+    makeFeatureRow({
+      event_id: "cqe_asymmetric_auto",
+      fires: {
+        ua_known_scanner: true,
+        network_known_email_security_asn: true,
+        js_executed: true,
+        cookie_present: true,
+      },
+    }),
+    thresholdSet,
+  );
+  assert.equal(result.auto_score, 6);
+  assert.equal(result.human_score, 2);
+  assert.equal(result.human_score < thresholdSet.config.human_contradiction_min, true);
+  assert.equal(result.human_score < thresholdSet.config.auto_contradiction_min, false);
+  assert.equal(result.decision, "LIKELY_AUTOMATED");
+});
+
+test("LIKELY_HUMAN uses auto_contradiction_min, not human_contradiction_min", () => {
+  const thresholdSet = {
+    ...FROZEN_THRESHOLD_SET,
+    threshold_set_id: "cq-thr-asymmetric-human-gate",
+    config: {
+      ...FROZEN_THRESHOLD_CONFIG,
+      auto_contradiction_min: 3,
+      human_contradiction_min: 1,
+      conflict_auto_floor: 9,
+      conflict_human_floor: 9,
+    },
+  };
+  const result = classifyFeatureRow(
+    makeFeatureRow({
+      event_id: "cqe_asymmetric_human",
+      fires: {
+        ua_http_library: true,
+        ua_browser_like: true,
+        js_executed: true,
+        cookie_present: true,
+        interclick_think_time_3s_to_30m: true,
+        network_residential: true,
+      },
+    }),
+    thresholdSet,
+  );
+  assert.equal(result.auto_score, 2);
+  assert.ok(result.human_score >= 4);
+  assert.equal(result.auto_score < thresholdSet.config.auto_contradiction_min, true);
+  assert.equal(result.auto_score < thresholdSet.config.human_contradiction_min, false);
+  assert.equal(result.decision, "LIKELY_HUMAN");
+});
+
+test("threshold set with a different classifier_version is rejected before classification", () => {
+  const incompatible = {
+    ...FROZEN_THRESHOLD_SET,
+    threshold_set_id: "cq-thr-wrong-classifier",
+    classifier_version: "cq-clf-v9.9.9",
+  };
+  assert.throws(
+    () =>
+      classifyFeatureRow(
+        makeFeatureRow({
+          event_id: "cqe_wrong_clf",
+          fires: { ua_known_scanner: true, network_known_email_security_asn: true },
+        }),
+        incompatible,
+      ),
+    ClickQualityClassifierVersionMismatchError,
+  );
+  assert.throws(
+    () =>
+      classifyFeatureRows(
+        [
+          makeFeatureRow({
+            event_id: "cqe_wrong_clf_batch",
+            fires: { js_executed: true },
+          }),
+        ],
+        incompatible,
+      ),
+    ClickQualityClassifierVersionMismatchError,
+  );
+});
+
+test("same-classifier threshold set with a different id remains accepted", () => {
+  const custom = {
+    ...FROZEN_THRESHOLD_SET,
+    threshold_set_id: "cq-thr-same-classifier-custom-id",
+  };
+  const result = classifyFeatureRow(
+    makeFeatureRow({
+      event_id: "cqe_custom_id",
+      fires: {
+        ua_known_scanner: true,
+        network_known_email_security_asn: true,
+        js_executed: true,
+        cookie_present: true,
+      },
+    }),
+    custom,
+  );
+  assert.equal(result.classifier_version, CLASSIFIER_VERSION);
+  assert.equal(result.threshold_set_id, "cq-thr-same-classifier-custom-id");
+  assert.equal(result.decision, "LIKELY_AUTOMATED");
 });
 
 test("repeated classification is deterministic", () => {

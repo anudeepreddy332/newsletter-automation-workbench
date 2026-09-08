@@ -20,14 +20,14 @@ export function decideClassification(
     row.evidence_quality !== "SPARSE" &&
     scores.auto_family_count >= config.min_auto_families &&
     scores.auto_score >= config.auto_score_min &&
-    scores.human_score < config.auto_contradiction_min &&
+    scores.human_score < config.human_contradiction_min &&
     !conflict;
 
   const likelyHuman =
     row.evidence_quality !== "SPARSE" &&
     hasPositiveHumanSupport(row) &&
     scores.human_score >= config.human_score_min &&
-    scores.auto_score < config.human_contradiction_min &&
+    scores.auto_score < config.auto_contradiction_min &&
     !conflict;
 
   if (likelyAutomated) {
