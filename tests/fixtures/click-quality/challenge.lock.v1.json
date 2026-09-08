@@ -1,0 +1,8 @@
+{
+  "schema_version": "cq-challenge-lock-v1",
+  "algorithm": "sha256",
+  "encoding": "hex",
+  "event_count": 30,
+  "canonicalization": "Read experiment-manifest.v1.json. Collect event_id values whose membership is challenge. Sort those IDs lexicographically. Load the matching objects from events.v1.json. Serialize them as a JSON array whose objects have lexicographically sorted keys at every object level, with no extra whitespace. Hash the UTF-8 bytes with SHA-256.",
+  "hash": "26f9f4c7f9b16e9041f02c1d91f4cc3bb518cf5fc69653acbe694d5ee234f212"
+}

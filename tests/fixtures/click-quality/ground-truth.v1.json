@@ -1,0 +1,455 @@
+{
+  "schema_version": "cq-ground-truth-v1",
+  "labels": {
+    "cqe_102b947fc38bc65c": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Obvious sequential security-gateway-like GET burst across all tracked links."
+    },
+    "cqe_584b0eac4c34b86f": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Obvious sequential security-gateway-like GET burst across all tracked links."
+    },
+    "cqe_7ebe1ed8f74f0765": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Obvious sequential security-gateway-like GET burst across all tracked links."
+    },
+    "cqe_fedabea83787c1a7": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Obvious sequential security-gateway-like GET burst across all tracked links."
+    },
+    "cqe_bdbdeec7c02ef288": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Second obvious sequential security-gateway-like GET burst."
+    },
+    "cqe_86fc44ed74e53c68": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Second obvious sequential security-gateway-like GET burst."
+    },
+    "cqe_e0de48ac771251de": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Second obvious sequential security-gateway-like GET burst."
+    },
+    "cqe_545833d68203cf7d": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Second obvious sequential security-gateway-like GET burst."
+    },
+    "cqe_d6a08f0eda97ea01": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "HEAD requests covering all tracked links."
+    },
+    "cqe_430b3ad3edf1177f": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "HEAD requests covering all tracked links."
+    },
+    "cqe_0fb79bd8c03a5698": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "HEAD requests covering all tracked links."
+    },
+    "cqe_b285a03e7cf63bd8": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "HEAD requests covering all tracked links."
+    },
+    "cqe_3b21afaf870389e8": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "First pass of a retry/rescan burst."
+    },
+    "cqe_e78232e5f375355d": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "First pass of a retry/rescan burst."
+    },
+    "cqe_4330524b4d12597e": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "First pass of a retry/rescan burst."
+    },
+    "cqe_61431f13df1eec7f": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Second pass of the same links about 25 minutes later (rescan)."
+    },
+    "cqe_b3ead929fe852b9b": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Second pass of the same links about 25 minutes later (rescan)."
+    },
+    "cqe_e104395f6afa25a1": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Second pass of the same links about 25 minutes later (rescan)."
+    },
+    "cqe_b5512cfaf575e346": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Browser-like automation: Chrome UA and cookie, cloud network, all links fast, JS not executed."
+    },
+    "cqe_84241fb83625a988": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Browser-like automation: Chrome UA and cookie, cloud network, all links fast, JS not executed."
+    },
+    "cqe_c8eaab96ad853e31": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Browser-like automation: Chrome UA and cookie, cloud network, all links fast, JS not executed."
+    },
+    "cqe_99152cf15bfc7aa7": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Browser-like automation: Chrome UA and cookie, cloud network, all links fast, JS not executed."
+    },
+    "cqe_13c8e7ffd35b4ded": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Browser-like automation: Chrome UA and cookie, cloud network, all links fast, JS not executed."
+    },
+    "cqe_103023b1536ec306": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Cloud-network automation using an HTTP library user agent."
+    },
+    "cqe_9b92474eae6ee1c7": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Cloud-network automation using an HTTP library user agent."
+    },
+    "cqe_bef1e7a7fe482715": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Cloud-network automation using an HTTP library user agent."
+    },
+    "cqe_f62729985752561c": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Ordinary human click with think time, residential network, JS, and cookie."
+    },
+    "cqe_a2d2728471c354fa": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Ordinary human click with think time, residential network, JS, and cookie."
+    },
+    "cqe_592ac1efc8e5ff97": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Ordinary human click with think time, residential network, JS, and cookie."
+    },
+    "cqe_a6457c74a8ca0cde": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Ordinary human click with think time, residential network, JS, and cookie."
+    },
+    "cqe_6070ad1fd355cc0b": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Ordinary human click with think time, residential network, JS, and cookie."
+    },
+    "cqe_578adf1121ebad44": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Ordinary human click with think time, residential network, JS, and cookie."
+    },
+    "cqe_ed60d75b86595d14": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Ordinary human click with think time, residential network, JS, and cookie."
+    },
+    "cqe_9d28001c3c863506": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Ordinary human click with think time, residential network, JS, and cookie."
+    },
+    "cqe_c32fe73d44ce7ed0": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Very-fast human: first-link click a few seconds after send, JS executed, residential."
+    },
+    "cqe_a1b79d7e03839d82": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Very-fast human: first-link click a few seconds after send, JS executed, residential."
+    },
+    "cqe_2ee661516d805c84": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Very-fast human: first-link click a few seconds after send, JS executed, residential."
+    },
+    "cqe_d4692160a0d56bbf": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Corporate NAT human: enterprise egress, browser client, JS executed."
+    },
+    "cqe_29fdeb43d9a595bf": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Corporate NAT human: enterprise egress, browser client, JS executed."
+    },
+    "cqe_c4d61126a57198c2": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Corporate NAT human: enterprise egress, browser client, JS executed."
+    },
+    "cqe_25af24e6ac215a30": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Corporate NAT human: enterprise egress, browser client, JS executed."
+    },
+    "cqe_aac6646edfec1768": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Human click from overlay/VPN-like egress with JS and cookie."
+    },
+    "cqe_40d6c65dfb467741": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Human click from overlay/VPN-like egress with JS and cookie."
+    },
+    "cqe_6c00eb802a14aa13": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Human click from overlay/VPN-like egress with JS and cookie."
+    },
+    "cqe_b9e5ed587c7dd1ef": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Human click from a privacy-relay-like network with Safari and JS."
+    },
+    "cqe_76f2444987b5bf28": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Human click from a privacy-relay-like network with Safari and JS."
+    },
+    "cqe_1399864af7c9177b": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Human click from a privacy-relay-like network with Safari and JS."
+    },
+    "cqe_975e9e6447d3bf32": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "No-JS / no-cookie human on residential network with delayed single click."
+    },
+    "cqe_1b9e4de307d4fcc7": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "No-JS / no-cookie human on residential network with delayed single click."
+    },
+    "cqe_3b303a9358f2cbb3": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "No-JS / no-cookie human on residential network with delayed single click."
+    },
+    "cqe_0ccb9b8954dc1473": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Forwarded-email human scenario. Observables only; no forward flag in the event."
+    },
+    "cqe_0388685e6fd6d68c": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Forwarded-email human scenario. Observables only; no forward flag in the event."
+    },
+    "cqe_68319f6e9a2e537c": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Repeated legitimate clicks on the same link over hours."
+    },
+    "cqe_03bc16e95e89ea27": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Repeated legitimate clicks on the same link over hours."
+    },
+    "cqe_22f4adba8efbc496": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Repeated legitimate clicks on the same link over hours."
+    },
+    "cqe_d8841558b0d6ec49": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Scanner-like burst that is later followed by a distinct human client on the same message."
+    },
+    "cqe_80f9943a3f499e21": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Scanner-like burst that is later followed by a distinct human client on the same message."
+    },
+    "cqe_9033c27a8fec5c00": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Scanner-like burst that is later followed by a distinct human client on the same message."
+    },
+    "cqe_ab98a03f3620aae9": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Later human request on the same message after an earlier scanner-like burst."
+    },
+    "cqe_1ee43b3bbac454d8": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Later human request on the same message after an earlier scanner-like burst."
+    },
+    "cqe_853c5098b0dcf125": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Frozen challenge: HEAD all-link requests."
+    },
+    "cqe_f9652a10ae1b2e85": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Frozen challenge: HEAD all-link requests."
+    },
+    "cqe_9432ca2ce9d5b0a3": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Frozen challenge: HEAD all-link requests."
+    },
+    "cqe_f7a8b2d1fc49b634": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Frozen challenge: HEAD all-link requests."
+    },
+    "cqe_9f8128621e9d0156": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Frozen challenge: all-links-fast GET burst."
+    },
+    "cqe_03cd6ff75168a114": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Frozen challenge: all-links-fast GET burst."
+    },
+    "cqe_3f584ff594222a0e": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Frozen challenge: all-links-fast GET burst."
+    },
+    "cqe_c80deb7f7a932e60": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Frozen challenge: all-links-fast GET burst."
+    },
+    "cqe_be733a4a357a4e23": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Frozen challenge: browser-like automation with a headless-like UA."
+    },
+    "cqe_734c677b1b2a09ea": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Frozen challenge: browser-like automation with a headless-like UA."
+    },
+    "cqe_d851c1619d7f9ce8": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Frozen challenge: browser-like automation with a headless-like UA."
+    },
+    "cqe_b0f28f667f76a842": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Frozen challenge: ordinary human click."
+    },
+    "cqe_7eaa07a79ae4544b": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Frozen challenge: ordinary human click."
+    },
+    "cqe_7d1105a473974ba2": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Frozen challenge: ordinary human click."
+    },
+    "cqe_a01d101ef5dd7b37": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Frozen challenge: ordinary human click."
+    },
+    "cqe_14f20e71a9e570a6": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Frozen challenge: very-fast human first-link click."
+    },
+    "cqe_5c4ec3c524475aa4": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Frozen challenge: very-fast human first-link click."
+    },
+    "cqe_ac08f840edb7f00d": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Frozen challenge: human click from overlay/VPN-like egress."
+    },
+    "cqe_6dee75cc1667ba05": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Frozen challenge: human click from overlay/VPN-like egress."
+    },
+    "cqe_f206b932ba54e482": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Frozen challenge: privacy-relay human."
+    },
+    "cqe_28152bb31fb64ba0": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Frozen challenge: corporate NAT human."
+    },
+    "cqe_17f6a1e11acced1e": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Frozen challenge: corporate NAT human."
+    },
+    "cqe_420aece186a1f538": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Frozen challenge: no-JS / no-cookie human."
+    },
+    "cqe_89e15586e844b73e": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Frozen challenge: no-JS / no-cookie human."
+    },
+    "cqe_4a2ea7679d2ecb79": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Frozen challenge: forwarded-email human scenario. Observables only; no forward flag."
+    },
+    "cqe_4f4193b6b8ee062a": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Frozen challenge: scanner-like pair later followed by a distinct human client."
+    },
+    "cqe_d3642dbebcbdb35b": {
+      "label": "AUTOMATED",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Frozen challenge: scanner-like pair later followed by a distinct human client."
+    },
+    "cqe_df0ff387d49561b1": {
+      "label": "HUMAN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Frozen challenge: later human request after a scanner-like pair."
+    },
+    "cqe_2183e540c0d220b3": {
+      "label": "UNKNOWN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Sparse/missing evidence: UA missing, network unknown, JS/cookie unknown."
+    },
+    "cqe_2f6e6c00ba15c1d9": {
+      "label": "UNKNOWN",
+      "provenance": "SYNTHETIC_DESIGN",
+      "notes": "Partial/missing evidence: UA present, network unknown, JS unknown."
+    }
+  }
+}

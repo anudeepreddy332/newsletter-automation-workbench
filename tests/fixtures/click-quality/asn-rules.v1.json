@@ -1,0 +1,36 @@
+{
+  "schema_version": "cq-asn-rules-v1",
+  "phase": "phase-2-only",
+  "rules": [
+    {
+      "asn": 64512,
+      "network_type": "cloud_hosting",
+      "email_security": true
+    },
+    {
+      "asn": 64513,
+      "network_type": "cloud_hosting",
+      "email_security": false
+    },
+    {
+      "asn": 64514,
+      "network_type": "residential",
+      "email_security": false
+    },
+    {
+      "asn": 64515,
+      "network_type": "corporate",
+      "email_security": false
+    },
+    {
+      "asn": 64516,
+      "network_type": "vpn",
+      "email_security": false
+    },
+    {
+      "asn": 64517,
+      "network_type": "privacy_relay",
+      "email_security": false
+    }
+  ]
+}

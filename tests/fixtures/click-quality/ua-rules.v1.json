@@ -1,0 +1,30 @@
+{
+  "schema_version": "cq-ua-rules-v1",
+  "phase": "phase-2-only",
+  "rules": [
+    {
+      "class": "known_scanner",
+      "substring": "SyntheticMailSec/"
+    },
+    {
+      "class": "http_library",
+      "substring": "python-httpx/"
+    },
+    {
+      "class": "headless_browser",
+      "substring": "HeadlessChrome/"
+    },
+    {
+      "class": "browser_like",
+      "substring": "Chrome/"
+    },
+    {
+      "class": "browser_like",
+      "substring": "Firefox/"
+    },
+    {
+      "class": "browser_like",
+      "substring": "Safari/"
+    }
+  ]
+}
