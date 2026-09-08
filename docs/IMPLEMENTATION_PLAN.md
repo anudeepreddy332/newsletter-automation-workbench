@@ -1,5 +1,13 @@
 # Implementation Plan
 
+> **Feature-branch notice.** This document is the historical, frozen POC
+> implementation sequence. It is not updated with later
+> integration-hardening phases. Those belong to a separate educational
+> overlay on this feature branch; see
+> [INTEGRATION_HARDENING_DRILL.md](./INTEGRATION_HARDENING_DRILL.md) and
+> [INTEGRATION_DEMO_RUNBOOK.md](./INTEGRATION_DEMO_RUNBOOK.md). `main` is
+> unchanged. Do not treat the drill as original POC milestones.
+
 ## Governing sequence
 
 No milestone may begin until the previous milestone passes independent review.

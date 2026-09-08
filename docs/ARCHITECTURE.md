@@ -1,5 +1,13 @@
 # Architecture Contract
 
+> **Feature-branch notice.** This document describes the frozen original POC
+> baseline. This feature branch also contains a separate educational
+> integration-hardening drill. See
+> [INTEGRATION_HARDENING_DRILL.md](./INTEGRATION_HARDENING_DRILL.md) and
+> [INTEGRATION_DEMO_RUNBOOK.md](./INTEGRATION_DEMO_RUNBOOK.md). `main` is
+> unchanged. The drill is not claimed as the stakeholder's final production
+> architecture.
+
 ## Purpose and boundary
 
 This document freezes a single-operator, modular POC architecture rather than

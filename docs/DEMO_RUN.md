@@ -1,5 +1,14 @@
 # Demo run
 
+> **Which demo is this?** This file is the original WordPress POC demo
+> runbook. For the integration-hardening drill demo, use
+> [INTEGRATION_DEMO_RUNBOOK.md](./INTEGRATION_DEMO_RUNBOOK.md).
+>
+> This document describes the frozen original POC baseline. Architecture and
+> phases for the separate educational overlay are in
+> [INTEGRATION_HARDENING_DRILL.md](./INTEGRATION_HARDENING_DRILL.md). `main`
+> is unchanged.
+
 Operator runbook for a repeatable local demo of the Newsletter Automation
 Workbench POC. This is not a production runbook.
 

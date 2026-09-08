@@ -1,5 +1,43 @@
 # Newsletter Automation Workbench POC
 
+## Integration-hardening feature branch
+
+This branch keeps the original Newsletter Automation Workbench POC as the
+frozen baseline. `main` has not been changed.
+
+Original POC:
+
+```text
+fixture RSS -> editorial workflow -> real WordPress.com -> Mock Iterable
+```
+
+This feature branch also adds a separate educational integration-hardening
+overlay. It is not claimed as the stakeholder's final production architecture.
+
+Integration drill:
+
+```text
+fixture / provider-shaped data
+  -> normalize
+  -> Postgres
+  -> read-only FastAPI
+  -> Next.js server-side HTTP
+  -> SQLite snapshots
+  -> React workbench
+```
+
+The overlay includes a Postgres integration/source store, fixture RSS parse
+and normalize into Postgres, mocked Everflow-style offers into Postgres,
+read-only FastAPI `GET /stories` and `GET /offers`, server-side Next.js HTTP,
+SQLite local snapshots, bounded retries with backoff, jitter, and
+Retry-After, and drill-only Fetch Stories / Fetch advertiser links.
+
+Architecture and phases:
+[docs/INTEGRATION_HARDENING_DRILL.md](docs/INTEGRATION_HARDENING_DRILL.md)
+
+Screen-share startup:
+[docs/INTEGRATION_DEMO_RUNBOOK.md](docs/INTEGRATION_DEMO_RUNBOOK.md)
+
 ## Problem being solved
 
 The Newsletter Automation Workbench POC makes a stakeholder-reported,
